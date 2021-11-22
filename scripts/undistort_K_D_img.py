@@ -17,8 +17,6 @@ def undistort(m_K, m_D, img_path):
 
 
 if __name__ == '__main__':
-    # for p in sys.argv[1:]:
-        # undistort(p)
     K = np.loadtxt(sys.argv[1])
     D = np.loadtxt(sys.argv[2])
     for p in sys.argv[3:]:
