@@ -16,7 +16,12 @@
 
 /* other important includes */
 #include <nav_msgs/Odometry.h>
+#include <sensor_msgs/image_encodings.h>
 
+/* opencv */
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui.hpp>
 //}
 
 namespace camera_localisation {
@@ -34,9 +39,12 @@ namespace camera_localisation {
 
         /* ros parameters */
         std::string m_uav_name;
+        std::string m_fleft_topic_name;
+        std::string m_fright_topic_name;
 
         /* other parameters */
 
+        cv::Rect m_roi;
 
 
         // | --------------------- MRS transformer -------------------- |
@@ -46,17 +54,20 @@ namespace camera_localisation {
         // | ---------------------- msg callbacks --------------------- |
         [[maybe_unused]] void m_callb_example([[maybe_unused]] const nav_msgs::Odometry::ConstPtr &msg);
 
+        [[maybe_unused]] void m_callb_crop_image([[maybe_unused]] const sensor_msgs::ImageConstPtr &msg);
+
         // | --------------------- timer callbacks -------------------- |
         ros::Timer m_tim_example;
 
         [[maybe_unused]] void m_tim_callb_example([[maybe_unused]] const ros::TimerEvent &ev);
 
         // | ----------------------- publishers ----------------------- |
-        ros::Publisher m_pub_example;
+        ros::Publisher m_pub_fright_roi;
+        ros::Publisher m_pub_fleft_roi;
 
         // | ----------------------- subscribers ---------------------- |
-        ros::Subscriber m_sub_example;
-
+        ros::Subscriber m_sub_fright_rect;
+        ros::Subscriber m_sub_fleft_rect;
         // | --------------------- other functions -------------------- |
 
     };

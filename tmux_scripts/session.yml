@@ -1,0 +1,21 @@
+name: simulation
+root: ./
+startup_window: status
+windows:
+  - roscore:
+      layout: tiled
+      panes:
+        - roscore
+  - pylon_camera_driver:
+      layout: tiled
+      panes:
+        - waitForRos; roslaunch pylon_camera morhunenko.launch
+  - rqt_imgs:
+      layout: tiled
+      panes:
+        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localisation/image_fwd_left_rect_cropped
+        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localisation/image_fwd_right_rect_cropped
+  - uav_camera_localisation:
+      layout: tiled
+      panes:
+        - waitForRos; roslaunch uav_camera_localisation uav_camera_localisation.launch

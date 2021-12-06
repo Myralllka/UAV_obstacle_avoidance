@@ -1,0 +1,16 @@
+# relative rotations and translations of cameras with respect to camera 1 (fwd left)
+
+fwd_left:
+  rect_topic_name: "/uav1/basler_left/image_rect"
+  R: [1, 0, 0,
+      0, 1, 0
+      0, 0, 1]
+  t: [0, 0, 0]
+
+fwd_right:
+  rect_topic_name: "/uav1/basler_right/image_rect"
+  R: [0, 0, 1,
+      0, 1, 0
+      -1, 0, 0]
+  t: [82.9294, 0, 82.9294]
+
