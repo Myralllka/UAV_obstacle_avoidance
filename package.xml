@@ -18,6 +18,7 @@
   <depend>nav_msgs</depend>
   <depend>mrs_lib</depend>
   <depend>cv_bridge</depend>
+  <depend>basler_stereopair_driver</depend> <!-- https://github.com/Myralllka/UAV_basler_stereopair_driver -->
   <depend>pylon_camera</depend> <!--https://mrs.felk.cvut.cz/gitlab/uav/drivers/pylon-ros-camera/tree/sdk6.2.0-->
   <depend>apriltag_ros</depend> <!-- https://github.com/AprilRobotics/apriltag_ros -->
 

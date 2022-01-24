@@ -2,7 +2,6 @@
 
 /* every nodelet must include macros which export the class as a nodelet plugin */
 #include <pluginlib/class_list_macros.h>
-#include "CameraLocalisation.h"
 
 namespace camera_localisation {
 
@@ -120,12 +119,6 @@ namespace camera_localisation {
 
         std::cout << std::abs(static_cast<double>(left->header.stamp.toNSec()) -
                               static_cast<double>(right->header.stamp.toNSec())) << std::endl;
-
-        //if (std::abs(static_cast<double>(left->header.stamp.toNSec()) -
-        //             static_cast<double>(right->header.stamp.toNSec())) >= 900000000) {
-        //    ROS_ERROR_THROTTLE(1.0, "[CameraLocalisation]: l and r: too old imgs");
-        //    return;
-        //}
 
         ROS_INFO_THROTTLE(1.0, "[CameraLocalisation]:timer callback published ");
     }
