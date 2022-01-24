@@ -47,7 +47,6 @@ namespace camera_localisation {
                                                             8); // last param for queue size
         m_pub_fleft_roi = nh.advertise<sensor_msgs::Image>("image_fwd_left_rect_cropped",
                                                            8);
-
         // | ---------------- subscribers initialize ------------------ |
         m_sub_fleft_rect = nh.subscribe(m_fleft_topic_name,
                                         8,
@@ -62,7 +61,7 @@ namespace camera_localisation {
         m_transformer = mrs_lib::Transformer("CameraLocalisation", m_uav_name);
 
         // | -------------------- initialize timers ------------------- |
-        m_tim_example = nh.createTimer(ros::Duration(0.1), &CameraLocalisation::m_tim_callb_example, this);
+        m_tim_example = nh.createTimer(ros::Duration(1), &CameraLocalisation::m_tim_callb_example, this);
         ROS_INFO_ONCE("[CameraLocalisation]: initialized");
 
         m_is_initialized = true;
@@ -71,16 +70,6 @@ namespace camera_localisation {
 
 
 // | ---------------------- msg callbacks --------------------- |
-    [[maybe_unused]] void
-    CameraLocalisation::m_callb_example([[maybe_unused]] const nav_msgs::Odometry::ConstPtr &msg) {
-        if (not m_is_initialized) return;
-    }
-
-// | --------------------- timer callbacks -------------------- |
-    void CameraLocalisation::m_tim_callb_example([[maybe_unused]] const ros::TimerEvent &ev) {
-        if (not m_is_initialized) return;
-    }
-
     void CameraLocalisation::m_callb_crop_image(const sensor_msgs::ImageConstPtr &msg) {
         cv_bridge::CvImagePtr cv_ptr;
         try {
@@ -106,9 +95,42 @@ namespace camera_localisation {
             ROS_ERROR_THROTTLE(1.0, "[CameraLocalisation]: wrong header frame id: %s", msg->header.frame_id.c_str());
             return;
         }
+        //std::cout << "[D][CameraLocalisation]:" << cv_ptr->header.frame_id << std::endl;
+        // chessboard detection
+        cv::Size pattern_size{9, 7};
+        cv::Size sqr_size{8, 8};
+        cv::Size zero_zone_size{-1, -1};
+        cv::Mat gray;
+        cv::cvtColor(cv_ptr->image, gray, cv::COLOR_BGR2GRAY);
 
-        std::cout << "[D][CameraLocalisation]:" << cv_ptr->header.frame_id << std::endl;
+        //if (pattern_found) {
+        //    std::ostringstream filename;
+        //    filename << "image_" << std::to_string(counter++) << ".png";
+        //    cv::imwrite(filename.str(), cv_ptr->image);
+        //}
     }
+
+// | --------------------- timer callbacks -------------------- |
+
+    void CameraLocalisation::m_tim_callb_example([[maybe_unused]] const ros::TimerEvent &ev) {
+        if (not m_is_initialized) {
+            ROS_ERROR_ONCE("[CameraLocalisation]: timer: not initialised");
+            return;
+        }
+
+        std::cout << std::abs(static_cast<double>(left->header.stamp.toNSec()) -
+                              static_cast<double>(right->header.stamp.toNSec())) << std::endl;
+
+        //if (std::abs(static_cast<double>(left->header.stamp.toNSec()) -
+        //             static_cast<double>(right->header.stamp.toNSec())) >= 900000000) {
+        //    ROS_ERROR_THROTTLE(1.0, "[CameraLocalisation]: l and r: too old imgs");
+        //    return;
+        //}
+
+        ROS_INFO_THROTTLE(1.0, "[CameraLocalisation]:timer callback published ");
+    }
+
+
 // | -------------------- other functions ------------------- |
 
 }  // namespace camera_localisation  

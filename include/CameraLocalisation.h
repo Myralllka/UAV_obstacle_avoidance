@@ -9,6 +9,7 @@
 /* some STL includes */
 #include <cstdlib>
 #include <cstdio>
+#include <vector>
 
 /* custom helper functions from our library */
 #include <mrs_lib/param_loader.h>
@@ -22,6 +23,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui.hpp>
+#include "opencv2/calib3d.hpp"
 //}
 
 namespace camera_localisation {
@@ -36,34 +38,26 @@ namespace camera_localisation {
     private:
         /* flags */
         bool m_is_initialized = false;
-
         /* ros parameters */
         std::string m_uav_name;
         std::string m_fleft_topic_name;
         std::string m_fright_topic_name;
-
         /* other parameters */
-
         cv::Rect m_roi;
-
-
         // | --------------------- MRS transformer -------------------- |
-
         mrs_lib::Transformer m_transformer;
-
         // | ---------------------- msg callbacks --------------------- |
-        [[maybe_unused]] void m_callb_example([[maybe_unused]] const nav_msgs::Odometry::ConstPtr &msg);
-
         [[maybe_unused]] void m_callb_crop_image([[maybe_unused]] const sensor_msgs::ImageConstPtr &msg);
-
         // | --------------------- timer callbacks -------------------- |
         ros::Timer m_tim_example;
 
         [[maybe_unused]] void m_tim_callb_example([[maybe_unused]] const ros::TimerEvent &ev);
-
         // | ----------------------- publishers ----------------------- |
         ros::Publisher m_pub_fright_roi;
         ros::Publisher m_pub_fleft_roi;
+
+        cv_bridge::CvImagePtr left;
+        cv_bridge::CvImagePtr right;
 
         // | ----------------------- subscribers ---------------------- |
         ros::Subscriber m_sub_fright_rect;

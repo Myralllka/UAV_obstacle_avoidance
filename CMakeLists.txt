@@ -9,26 +9,27 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(-Wall -Wextra -pedantic -Werror -Werror=vla)
 
 find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  std_msgs
-  mrs_lib
-  nav_msgs
-  cv_bridge
-
-)
+        roscpp
+        std_msgs
+        mrs_lib
+        nav_msgs
+        cv_bridge
+        apriltag_ros
+        )
 
 find_package(OpenCV REQUIRED)
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES 
-  CATKIN_DEPENDS roscpp mrs_lib cv_bridge
+        INCLUDE_DIRS include
+        LIBRARIES
+        CATKIN_DEPENDS roscpp mrs_lib cv_bridge
 )
 
 include_directories(include
-  ${catkin_INCLUDE_DIRS}
-  ${OpenCV_INCLUDE_DIRS}
-)
+        ${catkin_INCLUDE_DIRS}
+        ${OpenCV_INCLUDE_DIRS}
+        )
 
 add_library(${FILESNAME} src/${FILESNAME}.cpp)
 
