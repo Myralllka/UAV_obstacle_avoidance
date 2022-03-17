@@ -49,16 +49,12 @@ namespace camera_localisation {
 
         /* ros parameters */
         std::string m_uav_name;
-        std::string m_fleft_topic_name;
-        std::string m_fright_topic_name;
 
         /* other parameters */
-        cv::Rect m_roi;
         // | --------------------- MRS transformer -------------------- |
         mrs_lib::Transformer m_transformer;
 
         // | ---------------------- msg callbacks --------------------- |
-        [[maybe_unused]] void m_callb_crop_image([[maybe_unused]] const sensor_msgs::ImageConstPtr &msg);
 
         // | --------------------- timer callbacks -------------------- |
         ros::Timer m_tim_example;
@@ -66,14 +62,9 @@ namespace camera_localisation {
         [[maybe_unused]] void m_tim_callb_example([[maybe_unused]] const ros::TimerEvent &ev);
 
         // | ----------------------- publishers ----------------------- |
-        ros::Publisher m_pub_fright_roi;
-        ros::Publisher m_pub_fleft_roi;
 
-        cv_bridge::CvImagePtr left;
-        cv_bridge::CvImagePtr right;
         // | ----------------------- subscribers ---------------------- |
-        ros::Subscriber m_sub_fright_rect;
-        ros::Subscriber m_sub_fleft_rect;
+
         // | --------------------- other functions -------------------- |
     };
 //}
