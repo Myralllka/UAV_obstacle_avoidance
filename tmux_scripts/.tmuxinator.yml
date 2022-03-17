@@ -19,10 +19,10 @@ windows:
       layout: tiled
       panes:
         - waitForRos; roslaunch basler_stereopair_driver basler_stereopair_driver.launch is_calibrated:=true
-#  - uav_camera_localisation:
-#      layout: tiled
-#      panes:
-#        - waitForRos; roslaunch uav_camera_localisation uav_camera_localisation.launch
+  - uav_camera_localisation:
+      layout: tiled
+      panes:
+        - waitForRos; roslaunch uav_camera_localisation uav_camera_localisation.launch
   - rviz:
       layout: tiled
       panes:

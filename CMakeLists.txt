@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
         nav_msgs
         cv_bridge
         apriltag_ros
+        basler_stereopair_driver
         )
 
 find_package(OpenCV REQUIRED)
