@@ -13,8 +13,11 @@ windows:
   - rqt_imgs:
       layout: tiled
       panes:
-        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fleft/tag_detections_image
-        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fright/tag_detections_image
+  #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fleft/tag_detections_image
+  #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fright/tag_detections_image
+  #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/im_epileft
+  #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/im_epiright
+  #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/im_corresp
   - basler_driver:
       layout: tiled
       panes:
@@ -23,7 +26,12 @@ windows:
       layout: tiled
       panes:
         - waitForRos; roslaunch uav_camera_localisation uav_camera_localisation.launch
-  - rviz:
-      layout: tiled
+#  - rviz:
+#      layout: tiled
+#      panes:
+#        - waitForRos; rviz -d $(rospack find basler_stereopair_driver)/rviz/config.rviz
+  - epipolar_lines:
+      layout: even-horizontal
       panes:
-        - waitForRos; rviz -d $(rospack find basler_stereopair_driver)/rviz/config.rviz
+        - waitForRos; rosrun uav_camera_localisation scripts/epipolar_line.py
+        - waitForRos; rosrun uav_camera_localisation scripts/publisher.py

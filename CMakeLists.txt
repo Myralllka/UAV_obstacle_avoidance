@@ -27,6 +27,10 @@ catkin_package(
         CATKIN_DEPENDS roscpp mrs_lib cv_bridge
 )
 
+catkin_install_python(PROGRAMS scripts/epipolar_line.py scripts/publisher.py
+        DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+        )
+
 include_directories(include
         ${catkin_INCLUDE_DIRS}
         ${OpenCV_INCLUDE_DIRS}
