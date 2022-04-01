@@ -27,7 +27,7 @@ catkin_package(
         CATKIN_DEPENDS roscpp mrs_lib cv_bridge
 )
 
-catkin_install_python(PROGRAMS scripts/epipolar_line.py scripts/publisher.py
+catkin_install_python(PROGRAMS scripts/epipolar_line.py
         DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
         )
 

@@ -1,61 +1,36 @@
 #!/bin/env python3
 
 import cv2
+import geometry_msgs.msg
 import rospy
 import random
 import numpy as np
+import image_geometry
+import tf2_ros
+import tf2_geometry_msgs
 
 from cv_bridge import CvBridge, CvBridgeError
 
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
 
-img_right, img_left = None, None
+img_right, img_left, RL_transform = None, None, None
 bridge = CvBridge()
 
-
-def sqc(x):
-    """
-    Skew-symmetric matrix for cross-product
-    Synopsis: S = sqc(x)
-    :param x: vector 3×1
-    :return: skew symmetric matrix (3×3) for cross product with x
-    """
-    return np.mat([[0, x[0, 2], -x[0, 1]],
-                   [-x[0, 2], 0, x[0, 0]],
-                   [x[0, 1], -x[0, 0], 0]])
-
-
-RL_t = [0.0957874,
-        -0.00830055,
-        -0.0937745]
-RL_r = [[-0.00861925, 0.00341071, 0.999957],
-        [-0.0129028, 0.999911, -0.00352177],
-        [-0.99988, -0.0129326, -0.00857447]]
-K_left = [[814.70114, 0, 801.2499],
-          [0, 811.53998, 602.45886],
-          [0, 0, 1]]
-K_right = [[815.5976000000001, 0, 796.8774100000001],
-           [0, 812.26899, 584.6144],
-           [0, 0, 1]]
-
-RL_t = np.mat(RL_t)
-RL_r = np.mat(RL_r)
-
-K_left = np.mat(K_left)
-K_right = np.mat(K_right)
-
-# compute RL
-E = RL_r @ -sqc(RL_t)
-F = np.linalg.inv(K_left).T @ E @ np.linalg.inv(K_right)
-
-print(F)
 flag = False
+
+CL = image_geometry.PinholeCameraModel()
+CR = image_geometry.PinholeCameraModel()
+
+is_cameras_initialized = False
+
+is_left_init = False
+is_right_init = False
 
 
 def callback_right(data: Image):
     global img_right
     global flag
-    img_right = bridge.imgmsg_to_cv2(data, 'passthrough')
+    img_right = bridge.imgmsg_to_cv2(data, 'bgr8')
 
     cv2.imshow('image right', img_right)
     cv2.imshow('image left', img_left)
@@ -69,39 +44,94 @@ def callback_right(data: Image):
 
 
 def callback_left(data: Image):
+    if not is_cameras_initialized:
+        return
     global img_left
     if flag:
         return
-    img_left = bridge.imgmsg_to_cv2(data, 'passthrough')
+    img_left = bridge.imgmsg_to_cv2(data, 'bgr8')
 
     print("callback_left complete")
 
 
 def click_event(event, x, y, flags, params):
+    global RL_transform
     # checking for left mouse clicks
+    if not is_cameras_initialized:
+        return
     if event == cv2.EVENT_LBUTTONDOWN:
         print(x, ' ', y)
         color = tuple(random.randint(0, 255) for _ in range(3))
-        # print(F)
-        # print(np.array([x, y, 1]))
-        epiline = -(F.T @ np.array([x, y, 1]))
 
-        x0, y0 = 0, int(-epiline[0, 2] / epiline[0, 1])
-        x1, y1 = 1920, int((-epiline[0, 2] + epiline[0, 0] * 1920) / epiline[0, 1])
+        td_ray = CR.projectPixelTo3dRay((x, y))
+        td_ray_vec = geometry_msgs.msg.Vector3Stamped()
+        td_ray_vec.vector.x = td_ray[0]
+        td_ray_vec.vector.y = td_ray[1]
+        td_ray_vec.vector.z = td_ray[2]
 
+        td_ray_vec.header.frame_id = "uav1/basler_right_optical"
+        td_ray_vec.header.stamp = rospy.Time.now()
+
+        ray_transformed = tf2_geometry_msgs.do_transform_vector3(td_ray_vec, RL_transform)
+        epiline = (ray_transformed.vector.x,
+                   ray_transformed.vector.y,
+                   ray_transformed.vector.z)
+        pt = CL.project3dToPixel(epiline)
+
+        pt = tuple(map(int, pt))
+
+        x0, y0 = 0, int(-epiline[2] / epiline[1])
+        x1, y1 = 1920, int((-epiline[2] + epiline[0] * 1920) / epiline[1])
         p1 = (x0, y0)
         p2 = (x1, y1)
 
+        print(p1, p2)
+
         cv2.circle(img_right, (x, y), 3, color, 3)
+        cv2.circle(img_left, pt, 3, color, 3)
         cv2.line(img_left, p1, p2, color, 2)
         cv2.imshow('image right', img_right)
         cv2.imshow('image left', img_left)
 
 
+def callback_cam_info_left(l_msg: CameraInfo):
+    global is_left_init, is_right_init, is_cameras_initialized, CL
+    if is_left_init:
+        return
+
+    if is_right_init:
+        is_cameras_initialized = True
+
+    CL.fromCameraInfo(l_msg)
+    is_left_init = True
+
+
+def callback_cam_info_right(l_msg: CameraInfo):
+    global is_left_init, is_right_init, is_cameras_initialized, CR
+    if is_right_init:
+        return
+
+    if is_left_init:
+        is_cameras_initialized = True
+
+    CR.fromCameraInfo(l_msg)
+    is_right_init = True
+
+
 def listener():
+    global RL_transform
     rospy.init_node("listener", anonymous=True)
     rospy.Subscriber("/uav1/basler_right/image_rect", Image, callback_right)
     rospy.Subscriber("/uav1/basler_left/image_rect", Image, callback_left)
+    rospy.Subscriber("/uav1/basler_left/camera_info", CameraInfo, callback_cam_info_left)
+    rospy.Subscriber("/uav1/basler_right/camera_info", CameraInfo, callback_cam_info_right)
+    tf_buffer = tf2_ros.Buffer(rospy.Duration(100))  # tf buffer length
+    tf_listener = tf2_ros.TransformListener(tf_buffer)
+    while not is_cameras_initialized:
+        continue
+    # target, source, time, timeout
+    RL_transform = tf_buffer.lookup_transform("uav1/basler_left_optical", "uav1/basler_right_optical", rospy.Time(),
+                                              rospy.Duration(100))
     rospy.spin()
 
 
