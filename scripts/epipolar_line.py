@@ -64,32 +64,30 @@ def click_event(event, x, y, flags, params):
         color = tuple(random.randint(0, 255) for _ in range(3))
 
         td_ray = CR.projectPixelTo3dRay((x, y))
-        td_ray_vec = geometry_msgs.msg.Vector3Stamped()
-        td_ray_vec.vector.x = td_ray[0]
-        td_ray_vec.vector.y = td_ray[1]
-        td_ray_vec.vector.z = td_ray[2]
+        td_ray_pt = geometry_msgs.msg.PointStamped()
+        td_ray_pt.point.x = td_ray[0]
+        td_ray_pt.point.y = td_ray[1]
+        td_ray_pt.point.z = td_ray[2]
 
-        td_ray_vec.header.frame_id = "uav1/basler_right_optical"
-        td_ray_vec.header.stamp = rospy.Time.now()
+        td_ray_pt.header.frame_id = "uav1/basler_right_optical"
+        td_ray_pt.header.stamp = rospy.Time.now()
 
-        ray_transformed = tf2_geometry_msgs.do_transform_vector3(td_ray_vec, RL_transform)
-        epiline = (ray_transformed.vector.x,
-                   ray_transformed.vector.y,
-                   ray_transformed.vector.z)
-        pt = CL.project3dToPixel(epiline)
+        ray_transformed = tf2_geometry_msgs.do_transform_point(td_ray_pt, RL_transform)
+        epiline = (ray_transformed.point.x,
+                   ray_transformed.point.y,
+                   ray_transformed.point.z)
 
-        pt = tuple(map(int, pt))
+        origin = RL_transform.transform.translation
+        origin = (origin.x,
+                  origin.y,
+                  origin.z)
 
-        x0, y0 = 0, int(-epiline[2] / epiline[1])
-        x1, y1 = 1920, int((-epiline[2] + epiline[0] * 1920) / epiline[1])
-        p1 = (x0, y0)
-        p2 = (x1, y1)
-
-        print(p1, p2)
+        pt = tuple(map(int, CL.project3dToPixel(epiline)))
+        o = tuple(map(int, CL.project3dToPixel(origin)))
 
         cv2.circle(img_right, (x, y), 3, color, 3)
         cv2.circle(img_left, pt, 3, color, 3)
-        cv2.line(img_left, p1, p2, color, 2)
+        cv2.line(img_left, pt, o, color, 2)
         cv2.imshow('image right', img_right)
         cv2.imshow('image left', img_left)
 
@@ -130,7 +128,9 @@ def listener():
     while not is_cameras_initialized:
         continue
     # target, source, time, timeout
-    RL_transform = tf_buffer.lookup_transform("uav1/basler_left_optical", "uav1/basler_right_optical", rospy.Time(),
+    RL_transform = tf_buffer.lookup_transform("uav1/basler_left_optical",
+                                              "uav1/basler_right_optical",
+                                              rospy.Time(),
                                               rospy.Duration(100))
     rospy.spin()
 
