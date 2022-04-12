@@ -8,9 +8,10 @@ import numpy as np
 import image_geometry
 import tf2_ros
 import tf2_geometry_msgs
+# import
 
 from cv_bridge import CvBridge, CvBridgeError
-
+from typing import Tuple, List
 from sensor_msgs.msg import Image, CameraInfo
 
 img_right, img_left, RL_transform = None, None, None
@@ -27,7 +28,17 @@ is_left_init = False
 is_right_init = False
 
 
+def cross(a: Tuple, b: Tuple):
+    c = [a[1] * b[2] - a[2] * b[1],
+         a[2] * b[0] - a[0] * b[2],
+         a[0] * b[1] - a[1] * b[0]]
+
+    return c
+
+
 def callback_right(data: Image):
+    if not is_cameras_initialized:
+        return
     global img_right
     global flag
     img_right = bridge.imgmsg_to_cv2(data, 'bgr8')
@@ -82,12 +93,20 @@ def click_event(event, x, y, flags, params):
                   origin.y,
                   origin.z)
 
-        pt = tuple(map(int, CL.project3dToPixel(epiline)))
-        o = tuple(map(int, CL.project3dToPixel(origin)))
+        pt: List = list(map(int, CL.project3dToPixel(epiline)))
+        o: List = list(map(int, CL.project3dToPixel(origin)))
+        pt.append(1)
+        o.append(1)
+
+        r = cross(pt, o)
+        print(r)
+        x0, y0 = map(int, [0, -r[2] / r[1]])
+        x1, y1 = map(int, [1920, -(r[2] + r[0] * 1920) / r[1]])
 
         cv2.circle(img_right, (x, y), 3, color, 3)
-        cv2.circle(img_left, pt, 3, color, 3)
-        cv2.line(img_left, pt, o, color, 2)
+        # cv2.circle(img_left, tuple(pt[:-1]), 3, color, 3)
+
+        cv2.line(img_left, (x0, y0), (x1, y1), color, 2)
         cv2.imshow('image right', img_right)
         cv2.imshow('image left', img_left)
 

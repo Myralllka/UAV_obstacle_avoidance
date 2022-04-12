@@ -36,7 +36,8 @@ namespace camera_localisation {
         // | ---------------- subscribers initialize ------------------ |
 
         // | --------------------- tf transformer --------------------- |
-        m_transformer = mrs_lib::Transformer("CameraLocalisation", m_uav_name);
+        m_transformer = mrs_lib::Transformer("CameraLocalisation");
+        m_transformer.setDefaultPrefix(m_uav_name);
 
         // | -------------------- initialize timers ------------------- |
         m_tim_example = nh.createTimer(ros::Duration(1), &CameraLocalisation::m_tim_callb_example, this);
