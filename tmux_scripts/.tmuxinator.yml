@@ -22,6 +22,7 @@ windows:
       layout: tiled
       panes:
         - waitForRos; roslaunch basler_stereopair_driver basler_stereopair_driver.launch is_calibrated:=true
+        - rostopic echo /uav1/basler_stereo_driver/multiview_labeled
   - uav_camera_localisation:
       layout: tiled
       panes:
@@ -30,7 +31,11 @@ windows:
 #      layout: tiled
 #      panes:
 #        - waitForRos; rviz -d $(rospack find basler_stereopair_driver)/rviz/config.rviz
-  - epipolar_lines:
-      layout: even-horizontal
+#  - epipolar_lines:
+#      layout: even-horizontal
+#      panes:
+#        - waitForRos; rosrun uav_camera_localisation scripts/epipolar_line.py
+  - corresp:
+      layout: tiled
       panes:
-        - waitForRos; rosrun uav_camera_localisation scripts/epipolar_line.py
+        - waitForRos; rosrun uav_camera_localisation scripts/correspondences.py
