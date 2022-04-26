@@ -17,7 +17,7 @@ windows:
   #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fright/tag_detections_image
   #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/im_epileft
   #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/im_epiright
-  #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/im_corresp
+          - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/im_corresp
   - basler_driver:
       layout: tiled
       panes:
@@ -35,7 +35,7 @@ windows:
 #      layout: even-horizontal
 #      panes:
 #        - waitForRos; rosrun uav_camera_localisation scripts/epipolar_line.py
-  - corresp:
-      layout: tiled
-      panes:
-        - waitForRos; rosrun uav_camera_localisation scripts/correspondences.py
+#  - corresp:
+#      layout: tiled
+#      panes:
+#        - waitForRos; rosrun uav_camera_localisation scripts/correspondences.py
