@@ -15,22 +15,22 @@ windows:
       panes:
   #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fleft/tag_detections_image
   #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fright/tag_detections_image
-  #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/im_epileft
-  #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/im_epiright
+#          - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/epimleft
+#          - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/epimright
           - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/im_corresp
-  - basler_driver:
-      layout: tiled
-      panes:
-        - waitForRos; roslaunch basler_stereopair_driver basler_stereopair_driver.launch is_calibrated:=true
-        - rostopic echo /uav1/basler_stereo_driver/multiview_labeled
   - uav_camera_localisation:
       layout: tiled
       panes:
         - waitForRos; roslaunch uav_camera_localisation uav_camera_localisation.launch
-#  - rviz:
-#      layout: tiled
-#      panes:
-#        - waitForRos; rviz -d $(rospack find basler_stereopair_driver)/rviz/config.rviz
+  - rviz:
+      layout: tiled
+      panes:
+        - waitForRos; rviz -d $(rospack find basler_stereopair_driver)/rviz/config.rviz
+  - basler_driver:
+      layout: tiled
+      panes:
+        - waitForRos; roslaunch basler_stereopair_driver basler_stereopair_driver.launch is_calibrated:=true
+#        - rostopic echo /uav1/basler_stereo_driver/multiview_labeled
 #  - epipolar_lines:
 #      layout: even-horizontal
 #      panes:

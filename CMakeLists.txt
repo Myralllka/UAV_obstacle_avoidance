@@ -10,11 +10,22 @@ add_compile_options(-Wall -Wextra -pedantic -Werror -Werror=vla)
 
 find_package(catkin REQUIRED COMPONENTS
         roscpp
+        nodelet
+        rospy
         std_msgs
         mrs_lib
+        mrs_msgs
         nav_msgs
-        cv_bridge
+        pcl_ros
+        pcl_conversions
+        tf2
+        tf2_ros
+        tf2_msgs
+        tf2_geometry_msgs
+        tf2_sensor_msgs
         apriltag_ros
+        geometry_msgs
+        image_geometry
         basler_stereopair_driver
         )
 
@@ -24,7 +35,7 @@ find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 catkin_package(
         INCLUDE_DIRS include
         LIBRARIES
-        CATKIN_DEPENDS roscpp mrs_lib cv_bridge
+        CATKIN_DEPENDS roscpp mrs_lib geometry_msgs mrs_msgs pcl_ros nav_msgs
 )
 
 catkin_install_python(PROGRAMS scripts/epipolar_line.py
