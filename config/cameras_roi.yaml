@@ -1,11 +1,5 @@
 cam_fleft_roi:
-  start_x: 1000
-  start_y: 200
-  w: 400 # x direction
-  h: 800 # y direction
+  x_y_w_h: [1000, 200, 400, 800]
 
 cam_fright_roi:
-  start_x: 200
-  start_y: 200
-  w: 400 # x direction
-  h: 800 # y direction
+  x_y_w_h: [200, 200, 400, 800]
