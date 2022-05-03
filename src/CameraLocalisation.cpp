@@ -39,6 +39,7 @@ namespace camera_localisation {
         // booleans for debug control
         pl.loadParam("corresp/debug_epipolar", m_debug_epipolar);
         pl.loadParam("corresp/debug_matches", m_debug_matches);
+        pl.loadParam("corresp/debug_markers", m_debug_markers);
 
         // image matching and filtering parameters
         int tmp_thr;
@@ -116,11 +117,17 @@ namespace camera_localisation {
 
 //        find base-to-right camera and base-to-left camera transformations
         ros::Duration(1.0).sleep();
+        setUp();
+        ROS_INFO_ONCE("[CameraLocalisation]: initialized");
+        m_is_initialized = true;
+    }
+//}
+
+    void CameraLocalisation::setUp() {
+
         auto m_fright_pose_opt = m_transformer.getTransform(m_name_CR, m_name_base);
         if (m_fright_pose_opt.has_value()) {
             m_fright_pose = tf2::transformToEigen(m_fright_pose_opt.value());
-            std::cout << m_fright_pose.translation() << std::endl;
-            std::cout << m_fright_pose.rotation() << std::endl;
         } else {
             ROS_ERROR_ONCE("[%s]: fuck. No right camera position found.\n", NODENAME.c_str());
             ros::shutdown();
@@ -133,6 +140,7 @@ namespace camera_localisation {
             ROS_ERROR_ONCE("[%s]: fuck. No left camera position found.\n", NODENAME.c_str());
             ros::shutdown();
         }
+
         auto m_RL_transform_opt = m_transformer.getTransform(m_name_CR, m_name_CL);
         auto m_LR_transform_opt = m_transformer.getTransform(m_name_CL, m_name_CR);
 
@@ -154,22 +162,143 @@ namespace camera_localisation {
 //        cv::eigen2cv(m_eig_P_L, m_P_L);
 //        cv::eigen2cv(m_eig_P_R, m_P_R);
 
-        ROS_INFO_ONCE("[CameraLocalisation]: initialized");
+        OL_frameR = {m_LR_transform.transform.translation.x,
+                     m_LR_transform.transform.translation.y,
+                     m_LR_transform.transform.translation.z};
 
-        m_is_initialized = true;
+        OR_frameL = {m_RL_transform.transform.translation.x,
+                     m_RL_transform.transform.translation.y,
+                     m_RL_transform.transform.translation.z};
 
+        m_o1_3d = cv::Point3d{m_fleft_pose.translation().x(),
+                              m_fleft_pose.translation().y(),
+                              m_fleft_pose.translation().z()};
+        m_o2_3d = cv::Point3d{m_fright_pose.translation().x(),
+                              m_fright_pose.translation().y(),
+                              m_fright_pose.translation().z()};
+
+        m_o1_2d = m_camera_right.project3dToPixel(OL_frameR);
+        m_o2_2d = m_camera_left.project3dToPixel(OR_frameL);
     }
-//}
-
-
 // | ---------------------- msg callbacks --------------------- |
 
 // | --------------------- timer callbacks -------------------- |
 
-    void CameraLocalisation::m_compute_kpts(const cv::Mat &img,
-                                            const cv::Mat &mask,
-                                            std::vector<cv::KeyPoint> &res_kpts,
-                                            cv::Mat &res_desk) {
+    void CameraLocalisation::m_tim_cbk_corresp([[maybe_unused]] const ros::TimerEvent &ev) {
+        if (not m_is_initialized) return;
+
+        if (m_handler_imleft.newMsg() and m_handler_imright.newMsg()) {
+
+            ROS_INFO_THROTTLE(2.0, "[%s]: looking for correspondences", NODENAME.c_str());
+
+            // use const + toCvShared
+            const auto cv_image_left = cv_bridge::toCvShare(m_handler_imleft.getMsg(), "bgr8").get()->image;
+            const auto cv_image_right = cv_bridge::toCvShare(m_handler_imright.getMsg(), "bgr8").get()->image;
+
+            cv::Mat descriptor1, descriptor2;
+            std::vector<cv::KeyPoint> keypoints1, keypoints2;
+
+            m_detect_and_compute_kpts(cv_image_left, m_mask_left, keypoints1, descriptor1);
+            m_detect_and_compute_kpts(cv_image_right, m_mask_right, keypoints2, descriptor2);
+            // detect features and compute correspondances
+
+            if ((keypoints1.size() < 10) or (keypoints2.size() < 10)) {
+                ROS_WARN_THROTTLE(1.0, "[%s]: no keypoints visible", NODENAME.c_str());
+                return;
+            }
+
+            std::vector<cv::DMatch> matches;
+            matcher->match(descriptor1,
+                           descriptor2,
+                           matches,
+                           cv::Mat());
+//            drop bad matches
+            std::sort(matches.begin(), matches.end());
+            const int num_good_matches = static_cast<int>(std::round(static_cast<double>(matches.size()) *
+                                                                     m_distance_ratio));
+            matches.erase(matches.begin() + num_good_matches, matches.end());
+
+            std::vector<cv::DMatch> matches_filtered;
+            std::vector<cv::Point2d> kpts_filtered_1, kpts_filtered_2;
+
+            filter_matches(matches,
+                           keypoints1, keypoints2,
+                           m_o1_2d, m_o2_2d,
+                           matches_filtered, kpts_filtered_1, kpts_filtered_2);
+
+            if (m_debug_matches) {
+                cv::Mat im_matches;
+                cv::drawMatches(cv_image_left, keypoints1,
+                                cv_image_right, keypoints2,
+                                matches_filtered,
+                                im_matches,
+                                cv::Scalar::all(-1), cv::Scalar::all(-1),
+                                std::vector<char>(),
+                                cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+                m_pub_im_corresp.publish(cv_bridge::CvImage(std_msgs::Header(), "bgr8", im_matches).toImageMsg());
+                ROS_INFO_THROTTLE(2.0, "[%s & OpenCV]: Correspondences published", NODENAME.c_str());
+            }
+            auto markerarr = boost::make_shared<visualization_msgs::MarkerArray>();
+            Eigen::Vector3d O{0, 0, 0};
+            int counter = 0;
+
+            //        Primitive triangulation
+            auto res_pts_3d = triangulate_primitive(kpts_filtered_1, kpts_filtered_2);
+            if (m_debug_markers) {
+                for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
+                    const auto color = generate_random_color();
+                    const auto cv_ray1 = m_camera_left.projectPixelTo3dRay(kpts_filtered_1[i]);
+                    const auto cv_ray2 = m_camera_right.projectPixelTo3dRay(kpts_filtered_2[i]);
+
+                    Eigen::Vector3d eigen_vec1{cv_ray1.x, cv_ray1.y, cv_ray1.z};
+                    Eigen::Vector3d eigen_vec2{cv_ray2.x, cv_ray2.y, cv_ray2.z};
+                    markerarr->markers.emplace_back(create_marker_ray(eigen_vec1, O, m_name_CL, counter++, color));
+                    markerarr->markers.emplace_back(create_marker_ray(eigen_vec2, O, m_name_CR, counter++, color));
+                    markerarr->markers.push_back(create_marker_pt(res_pts_3d[i], counter++, color));
+                }
+            }
+            m_pub_markarray.publish(markerarr);
+            res_pts_3d.emplace_back(m_o1_3d.x, m_o1_3d.y, m_o1_3d.z);
+            res_pts_3d.emplace_back(m_o2_3d.x, m_o2_3d.y, m_o2_3d.z);
+            auto pc = pts_to_cloud(res_pts_3d);
+            m_pub_pcld.publish(pc);
+        } else {
+            ROS_WARN_THROTTLE(2.0, "[%s]: No new images to search for correspondences", NODENAME.c_str());
+        }
+    }
+
+
+// | -------------------- other functions ------------------- |
+
+    // ===================== UTILS =====================
+    std::vector<Eigen::Vector3d> CameraLocalisation::triangulate_primitive(const std::vector<cv::Point2d> &kpts1,
+                                                                           const std::vector<cv::Point2d> &kpts2) {
+        std::vector<Eigen::Vector3d> res_pc;
+        for (size_t i = 0; i < kpts1.size(); ++i) {
+            auto cv_ray1 = m_camera_left.projectPixelTo3dRay(kpts1[i]);
+            auto cv_ray2 = m_camera_right.projectPixelTo3dRay(kpts2[i]);
+
+            Eigen::Vector3d eigen_vec1{cv_ray1.x, cv_ray1.y, cv_ray1.z};
+            Eigen::Vector3d eigen_vec2{cv_ray2.x, cv_ray2.y, cv_ray2.z};
+
+            auto ray_opt = m_transformer.transformSingle(m_name_CL, eigen_vec1, m_name_base, ros::Time(0));
+            auto ray2_opt = m_transformer.transformSingle(m_name_CR, eigen_vec2, m_name_base, ros::Time(0));
+            if (ray_opt.has_value() and ray2_opt.has_value()) {
+                auto pt = estimate_point_between_rays({m_o1_3d.x, m_o1_3d.y, m_o1_3d.z},
+                                                      {m_o2_3d.x, m_o2_3d.y, m_o2_3d.z},
+                                                      ray_opt.value(),
+                                                      ray2_opt.value());
+                res_pc.emplace_back(pt.x(), pt.y(), pt.z());
+            }
+        }
+        return res_pc;
+    }
+
+    void CameraLocalisation::m_detect_and_compute_kpts(const cv::Mat &img,
+                                                       const cv::Mat &mask,
+                                                       std::vector<cv::KeyPoint> &res_kpts,
+                                                       cv::Mat &res_desk) {
+        // Find all kpts on a bw image using the ORB detector
         cv::Mat img_gray;
         cv::cvtColor(img, img_gray, cv::COLOR_BGR2GRAY);
 
@@ -227,142 +356,6 @@ namespace camera_localisation {
         }
     }
 
-    void CameraLocalisation::m_tim_cbk_corresp([[maybe_unused]] const ros::TimerEvent &ev) {
-        if (not m_is_initialized) return;
-
-        if (m_handler_imleft.newMsg() and m_handler_imright.newMsg()) {
-
-            ROS_INFO_THROTTLE(2.0, "[%s]: looking for correspondences", NODENAME.c_str());
-
-            const cv::Point3d O1_3d{m_LR_transform.transform.translation.x,
-                                    m_LR_transform.transform.translation.y,
-                                    m_LR_transform.transform.translation.z};
-
-            const cv::Point3d O2_3d{m_RL_transform.transform.translation.x,
-                                    m_RL_transform.transform.translation.y,
-                                    m_RL_transform.transform.translation.z};
-
-            cv::Point2d o1_2d = m_camera_right.project3dToPixel(O1_3d);
-            cv::Point2d o2_2d = m_camera_left.project3dToPixel(O2_3d);
-            // use const + toCvShared
-            const auto cv_image_left = cv_bridge::toCvShare(m_handler_imleft.getMsg(), "bgr8").get()->image;
-            const auto cv_image_right = cv_bridge::toCvShare(m_handler_imright.getMsg(), "bgr8").get()->image;
-
-            cv::Mat descriptor1, descriptor2;
-            std::vector<cv::KeyPoint> keypoints1, keypoints2;
-
-            m_compute_kpts(cv_image_left, m_mask_left, keypoints1, descriptor1);
-            m_compute_kpts(cv_image_right, m_mask_right, keypoints2, descriptor2);
-            // detect features and compute correspondances
-
-            if ((keypoints1.size() < 10) or (keypoints2.size() < 10)) {
-                ROS_WARN_THROTTLE(1.0, "[%s]: no keypoints visible", NODENAME.c_str());
-                return;
-            }
-
-            std::vector<cv::DMatch> matches;
-            matcher->match(descriptor1,
-                           descriptor2,
-                           matches,
-                           cv::Mat());
-
-            std::sort(matches.begin(), matches.end());
-            const int num_good_matches = static_cast<int>(std::round(
-                    static_cast<double>(matches.size()) * m_distance_ratio));
-            matches.erase(matches.begin() + num_good_matches, matches.end());
-
-            std::vector<cv::DMatch> matches_filtered;
-
-            std::vector<cv::Point2d> kpts_filtered_1, kpts_filtered_2;
-
-            filter_matches(matches,
-                           keypoints1, keypoints2,
-                           o1_2d, o2_2d,
-                           matches_filtered,
-                           kpts_filtered_1, kpts_filtered_2);
-
-            if (m_debug_matches) {
-                cv::Mat im_matches;
-                cv::drawMatches(cv_image_left,
-                                keypoints1,
-                                cv_image_right,
-                                keypoints2,
-                                matches_filtered,
-                                im_matches,
-                                cv::Scalar::all(-1),
-                                cv::Scalar::all(-1),
-                                std::vector<char>(),
-                                cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-                m_pub_im_corresp.publish(cv_bridge::CvImage(std_msgs::Header(), "bgr8", im_matches).toImageMsg());
-                ROS_INFO_THROTTLE(2.0, "[%s & OpenCV]: Correspondences published", NODENAME.c_str());
-            }
-            auto markerarr = boost::make_shared<visualization_msgs::MarkerArray>();
-            Eigen::Vector3d O{0, 0, 0};
-            int counter = 0;
-
-            //        Primitive triangulation
-
-            auto or1 = cv::Point3d{m_fleft_pose.translation().x(),
-                                   m_fleft_pose.translation().y(),
-                                   m_fleft_pose.translation().z()};
-            auto or2 = cv::Point3d{m_fright_pose.translation().x(),
-                                   m_fright_pose.translation().y(),
-                                   m_fright_pose.translation().z()};
-            std::vector<cv::Point3d> res_pts_3d;
-            for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
-                auto color = generate_random_color();
-                auto cv_ray1 = m_camera_left.projectPixelTo3dRay(kpts_filtered_1[i]);
-                auto cv_ray2 = m_camera_right.projectPixelTo3dRay(kpts_filtered_2[i]);
-
-                Eigen::Vector3d eigen_vec1{cv_ray1.x, cv_ray1.y, cv_ray1.z};
-                Eigen::Vector3d eigen_vec2{cv_ray2.x, cv_ray2.y, cv_ray2.z};
-
-                auto ray_opt = m_transformer.transformSingle(m_name_CL,
-                                                             eigen_vec1,
-                                                             m_name_base,
-                                                             ros::Time(0));
-                auto ray2_opt = m_transformer.transformSingle(m_name_CR,
-                                                              eigen_vec2,
-                                                              m_name_base,
-                                                              ros::Time(0));
-                if (ray_opt.has_value() and ray2_opt.has_value()) {
-                    auto pt = estimate_point_between_rays({or1.x, or1.y, or1.z},
-                                                          {or2.x, or2.y, or2.z},
-                                                          ray_opt.value(),
-                                                          ray2_opt.value());
-                    res_pts_3d.emplace_back(pt.x(), pt.y(), pt.z());
-                    res_pts_3d.emplace_back(ray_opt->x(), ray_opt->y(), ray_opt->z());
-                    res_pts_3d.emplace_back(ray2_opt->x(), ray2_opt->y(), ray2_opt->z());
-                    markerarr->markers.emplace_back(create_marker_ray(ray_opt.value(),
-                                                                      O,
-                                                                      m_name_base,
-                                                                      counter++,
-                                                                      color));
-                    markerarr->markers.emplace_back(create_marker_ray(ray2_opt.value(),
-                                                                      O,
-                                                                      m_name_base,
-                                                                      counter++,
-                                                                      color));
-//                    markerarr->markers.push_back(create_marker_pt(pt,
-//                                                                  counter++,
-//                                                                  color));
-                }
-            }
-            m_pub_markarray.publish(markerarr);
-            res_pts_3d.push_back(or1);
-            res_pts_3d.push_back(or2);
-            auto pc = pts_to_cloud(res_pts_3d);
-            m_pub_pcld.publish(pc);
-        } else {
-            ROS_WARN_THROTTLE(2.0, "[%s]: No new images to search for correspondences", NODENAME.c_str());
-        }
-    }
-
-
-// | -------------------- other functions ------------------- |
-
-    // ===================== UTILS =====================
-
     Eigen::Vector3d CameraLocalisation::estimate_point_between_rays(const Eigen::Vector3d &o1,
                                                                     const Eigen::Vector3d &o2,
                                                                     const Eigen::Vector3d &r1,
@@ -391,7 +384,7 @@ namespace camera_localisation {
 
     visualization_msgs::Marker
     CameraLocalisation::create_marker_ray(const Eigen::Vector3d &pt,
-                                          const Eigen::Vector3d O,
+                                          const Eigen::Vector3d &O,
                                           const std::string &cam_name,
                                           const int id,
                                           const cv::Scalar &color) {
@@ -405,7 +398,6 @@ namespace camera_localisation {
         p1.z = pt.z();
         m1.ns = "rays";
         m1.id = id;
-//        m1.action = visualization_msgs::Marker::ADD;
         m1.color.a = 1;
         m1.lifetime = ros::Duration(1.0);
         m1.color.r = color[0] / 255.0;
@@ -425,7 +417,7 @@ namespace camera_localisation {
     }
 
     visualization_msgs::Marker
-    CameraLocalisation::create_marker_pt(const cv::Point3d &pt,
+    CameraLocalisation::create_marker_pt(const Eigen::Vector3d &pt,
                                          const int id,
                                          const cv::Scalar &color) {
         visualization_msgs::Marker m1;
@@ -433,15 +425,14 @@ namespace camera_localisation {
         m1.header.stamp = ros::Time::now();
         m1.ns = "points";
         m1.id = id;
-        m1.color.a = 1;
         m1.lifetime = ros::Duration(1.0);
+        m1.color.a = 1;
         m1.color.r = color[0] / 255.0;
         m1.color.g = color[1] / 255.0;
         m1.color.b = color[2] / 255.0;
-        m1.pose.position.x = pt.x;
-        m1.pose.position.y = pt.y;
-        m1.pose.position.z = pt.z;
-        std::cout << m1.points[0] << std::endl;
+        m1.pose.position.x = pt.x();
+        m1.pose.position.y = pt.y();
+        m1.pose.position.z = pt.z();
         m1.type = visualization_msgs::Marker::SPHERE;
         m1.scale.x = 0.1;
         m1.scale.y = 0.1;
@@ -460,16 +451,16 @@ namespace camera_localisation {
             D.row(1) = P1.row(2) * u1[i].y - P1.row(1);
             D.row(2) = P2.row(2) * u2[i].x - P2.row(0);
             D.row(3) = P2.row(2) * u2[i].y - P2.row(1);
-            Eigen::JacobiSVD < Eigen::Matrix < double, 4, 4 >, Eigen::ComputeThinU | Eigen::ComputeThinV > svd(D);
+            Eigen::JacobiSVD<Eigen::Matrix<double, 4, 4>, Eigen::ComputeThinU | Eigen::ComputeThinV> svd(D);
             auto X = svd.matrixV().bottomRows<1>();
-            std::cout << X << std::endl;
+//            std::cout << X << std::endl;
             res.emplace_back(X.x() / X.w(), X.y() / X.w(), X.z() / X.w());
         }
         return res;
     }
 
     //convert point cloud image to ros message
-    sensor_msgs::PointCloud2 CameraLocalisation::pts_to_cloud(const std::vector<cv::Point3d> &pts) {
+    sensor_msgs::PointCloud2 CameraLocalisation::pts_to_cloud(const std::vector<Eigen::Vector3d> &pts) {
         //rgb is a cv::Mat with 3 color channels of size 640x480
         //coords is a cv::Mat with xyz channels of size 640x480, units in mm from calibration
 
@@ -494,16 +485,16 @@ namespace camera_localisation {
         sensor_msgs::PointCloud2Iterator<float> out_x(cloud, "x");
         sensor_msgs::PointCloud2Iterator<float> out_y(cloud, "y");
         sensor_msgs::PointCloud2Iterator<float> out_z(cloud, "z");
-        sensor_msgs::PointCloud2Iterator <uint8_t> out_r(cloud, "r");
-        sensor_msgs::PointCloud2Iterator <uint8_t> out_g(cloud, "g");
-        sensor_msgs::PointCloud2Iterator <uint8_t> out_b(cloud, "b");
+        sensor_msgs::PointCloud2Iterator<uint8_t> out_r(cloud, "r");
+        sensor_msgs::PointCloud2Iterator<uint8_t> out_g(cloud, "g");
+        sensor_msgs::PointCloud2Iterator<uint8_t> out_b(cloud, "b");
 
         for (size_t i = 0; i < pts.size(); ++i, ++out_x, ++out_y, ++out_z, ++out_r, ++out_g, ++out_b) {
             //get the image coordinate for this point and convert to mm
-            cv::Point3d pointcoord = pts[i];
-            float X_World = pointcoord.x;
-            float Y_World = pointcoord.y;
-            float Z_World = pointcoord.z;
+            auto pointcoord = pts[i];
+            const float X_World = pointcoord.x();
+            const float Y_World = pointcoord.y();
+            const float Z_World = pointcoord.z();
             //store xyz in point cloud, transforming from image coordinates, (Z Forward to X Forward)
             *out_x = X_World;
             *out_y = Y_World;
@@ -532,7 +523,6 @@ namespace camera_localisation {
         // source https://docs.opencv.org/3.4/da/de9/tutorial_py_epipolar_geometry.html
         auto w = img.size[1]; // c
         for (size_t i = 0; i < line.size(); ++i) {
-//        for (size_t i = 0; i < 100; i += 20) {
             // randomly generate line color
             auto color = generate_random_color();
             auto x0 = .0f;

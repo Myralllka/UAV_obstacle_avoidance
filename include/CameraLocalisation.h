@@ -61,16 +61,6 @@ inline Eigen::Vector3d cross(const Eigen::Vector3d &a, const Eigen::Vector3d &b)
             a.z() * b.x() - a.x() * b.z(),
             a.x() * b.y() - a.y() * b.x()};
 }
-//template<typename T>
-//inline cv::Point3d cross(const cv::Point2d &a, const T &b) {
-//    return {a.y - b.y,
-//            b.x - a.x,
-//            a.x * b.y - a.y * b.x};
-//}
-
-//template<typename T>
-//inline cv::Point3d cross(const cv::Point3d &a, const T &b) {
-//}
 
 [[maybe_unused]] std::pair<cv::Point2d, cv::Point2d> line2image(const cv::Point3d &line, int imwidth) {
     auto x0 = .0f;
@@ -114,6 +104,7 @@ namespace camera_localisation {
         bool m_is_initialized = false;
         bool m_debug_matches;
         bool m_debug_epipolar;
+        bool m_debug_markers;
 
         /* ros parameters */
         std::string m_uav_name;
@@ -167,14 +158,21 @@ namespace camera_localisation {
         image_geometry::PinholeCameraModel m_camera_left;
         image_geometry::PinholeCameraModel m_camera_right;
 
+        cv::Point3d OL_frameR, OR_frameL, m_o1_3d, m_o2_3d;
+        cv::Point2d m_o1_2d, m_o2_2d;
         // | --------------------- other functions -------------------- |
 
         // ------------------------ UTILS -----------------------------
 
-        [[maybe_unused]] void m_compute_kpts(const cv::Mat &img,
-                                             const cv::Mat &mask,
-                                             std::vector<cv::KeyPoint> &res_kpts,
-                                             cv::Mat &res_desk);
+        void setUp();
+
+        [[maybe_unused]] std::vector<Eigen::Vector3d> triangulate_primitive(const std::vector<cv::Point2d> &kpts1,
+                                                                            const std::vector<cv::Point2d> &kpts2);
+
+        [[maybe_unused]] void m_detect_and_compute_kpts(const cv::Mat &img,
+                                                        const cv::Mat &mask,
+                                                        std::vector<cv::KeyPoint> &res_kpts,
+                                                        cv::Mat &res_desk);
 
         [[maybe_unused]] void filter_matches(const std::vector<cv::DMatch> &input_matches,
                                              const std::vector<cv::KeyPoint> &kpts1,
@@ -190,7 +188,7 @@ namespace camera_localisation {
                                                                             const std::vector<cv::Point2d> &u1,
                                                                             const std::vector<cv::Point2d> &u2);
 
-        [[maybe_unused]] sensor_msgs::PointCloud2 pts_to_cloud(const std::vector<cv::Point3d> &pts);
+        [[maybe_unused]] sensor_msgs::PointCloud2 pts_to_cloud(const std::vector<Eigen::Vector3d> &pts);
 
         [[maybe_unused]] Eigen::Vector3d estimate_point_between_rays(const Eigen::Vector3d &o1,
                                                                      const Eigen::Vector3d &o2,
@@ -198,12 +196,12 @@ namespace camera_localisation {
                                                                      const Eigen::Vector3d &r2);
 
         [[maybe_unused]] visualization_msgs::Marker create_marker_ray(const Eigen::Vector3d &pt,
-                                                                      const Eigen::Vector3d O,
+                                                                      const Eigen::Vector3d &O,
                                                                       const std::string &cam_name,
                                                                       const int id,
                                                                       const cv::Scalar &color);
 
-        [[maybe_unused]] visualization_msgs::Marker create_marker_pt(const cv::Point3d &pt,
+        [[maybe_unused]] visualization_msgs::Marker create_marker_pt(const Eigen::Vector3d &pt,
                                                                      const int id,
                                                                      const cv::Scalar &color);
 
