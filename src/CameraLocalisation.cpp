@@ -40,6 +40,7 @@ namespace camera_localisation {
         pl.loadParam("corresp/debug_epipolar", m_debug_epipolar);
         pl.loadParam("corresp/debug_matches", m_debug_matches);
         pl.loadParam("corresp/debug_markers", m_debug_markers);
+        pl.loadParam("corresp/debug_projective_error", m_debug_projective_error);
 
         // image matching and filtering parameters
         int tmp_thr;
@@ -56,12 +57,6 @@ namespace camera_localisation {
         pl.loadParam("corresp/n_features", n_features);
         detector = cv::ORB::create(n_features);
         // intrinsic camera parameters (calibration matrices)
-//        Eigen::Matrix<double, 3, 3> K_L, K_R;
-//        K_L = pl.loadMatrixStatic2<3, 3>("basler_left/camera_matrix/data");
-//        K_R = pl.loadMatrixStatic2<3, 3>("basler_right/camera_matrix/data");
-//        cv::eigen2cv(K_L, m_K_CL);
-//        cv::eigen2cv(K_R, m_K_CR);
-
         if (!pl.loadedSuccessfully()) {
             ROS_ERROR("[CameraLocalisation]: failed to load non-optional parameters!");
             ros::shutdown();
@@ -72,8 +67,10 @@ namespace camera_localisation {
 
         // | ----------------- publishers initialize ------------------ |
 
-        m_pub_im_left_epipolar = nh.advertise<sensor_msgs::Image>("epimleft", 1);
-        m_pub_im_right_epipolar = nh.advertise<sensor_msgs::Image>("epimright", 1);
+        // Just images for debug (epilines, error etc)
+        m_pub_im_left_debug = nh.advertise<sensor_msgs::Image>("left_debug", 1);
+        m_pub_im_right_debug = nh.advertise<sensor_msgs::Image>("right_debug", 1);
+
         m_pub_pcld = nh.advertise<sensor_msgs::PointCloud2>("tdpts", 1, true);
         m_pub_markarray = nh.advertise<visualization_msgs::MarkerArray>("markerarray", 1);
         m_pub_im_corresp = nh.advertise<sensor_msgs::Image>("im_corresp", 1);
@@ -115,6 +112,12 @@ namespace camera_localisation {
         m_camera_right.fromCameraInfo(m_handler_camrightinfo.getMsg());
         m_camera_left.fromCameraInfo(m_handler_camleftinfo.getMsg());
 
+        m_K_CL_eig = f2K33(m_handler_camleftinfo.getMsg()->P);
+        m_K_CR_eig = f2K33(m_handler_camrightinfo.getMsg()->P);
+
+        cv::eigen2cv(m_K_CL_eig, m_K_CL_cv);
+        cv::eigen2cv(m_K_CR_eig, m_K_CR_cv);
+
 //        find base-to-right camera and base-to-left camera transformations
         ros::Duration(1.0).sleep();
         setUp();
@@ -148,19 +151,22 @@ namespace camera_localisation {
             ROS_ERROR_THROTTLE(2.0, "NO RL OR LR transformation");
             ros::shutdown();
         }
+        // initialise transformations
         m_RL_transform = m_RL_transform_opt.value();
         m_LR_transform = m_LR_transform_opt.value();
-        // initialise transformations
-//        m_eig_P_L.topLeftCorner<3, 3>() = m_fleft_pose.rotation();
-//        m_eig_P_L.col(3) = m_fleft_pose.translation();
-//        m_eig_P_R.topLeftCorner<3, 3>() = m_fright_pose.rotation();
-//        m_eig_P_R.col(3) = m_fright_pose.translation();
-//
-//        m_eig_P_R = K_R * m_eig_P_R;
-//        m_eig_P_L = K_L * m_eig_P_L;
-//
-//        cv::eigen2cv(m_eig_P_L, m_P_L);
-//        cv::eigen2cv(m_eig_P_R, m_P_R);
+
+        m_P_L_eig.topLeftCorner<3, 3>() = m_fleft_pose.inverse().rotation();
+        m_P_L_eig.col(3) = m_fleft_pose.inverse().translation();
+
+        m_P_R_eig.topLeftCorner<3, 3>() = m_fright_pose.inverse().rotation();
+        m_P_R_eig.col(3) = m_fright_pose.inverse().translation();
+
+        m_P_R_eig = m_K_CR_eig * m_P_R_eig;
+        m_P_L_eig = m_K_CL_eig * m_P_L_eig;
+
+
+        cv::eigen2cv(m_P_L_eig, m_P_L_cv);
+        cv::eigen2cv(m_P_R_eig, m_P_R_cv);
 
         OL_frameR = {m_LR_transform.transform.translation.x,
                      m_LR_transform.transform.translation.y,
@@ -244,18 +250,37 @@ namespace camera_localisation {
 
             //        Primitive triangulation
             auto res_pts_3d = triangulate_primitive(kpts_filtered_1, kpts_filtered_2);
+            std::vector<cv::Scalar> colors;
             if (m_debug_markers) {
                 for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
                     const auto color = generate_random_color();
+                    colors.push_back(color);
+
                     const auto cv_ray1 = m_camera_left.projectPixelTo3dRay(kpts_filtered_1[i]);
                     const auto cv_ray2 = m_camera_right.projectPixelTo3dRay(kpts_filtered_2[i]);
+                    const Eigen::Vector3d eigen_vec1{cv_ray1.x, cv_ray1.y, cv_ray1.z};
+                    const Eigen::Vector3d eigen_vec2{cv_ray2.x, cv_ray2.y, cv_ray2.z};
 
-                    Eigen::Vector3d eigen_vec1{cv_ray1.x, cv_ray1.y, cv_ray1.z};
-                    Eigen::Vector3d eigen_vec2{cv_ray2.x, cv_ray2.y, cv_ray2.z};
                     markerarr->markers.emplace_back(create_marker_ray(eigen_vec1, O, m_name_CL, counter++, color));
                     markerarr->markers.emplace_back(create_marker_ray(eigen_vec2, O, m_name_CR, counter++, color));
                     markerarr->markers.push_back(create_marker_pt(res_pts_3d[i], counter++, color));
                 }
+            }
+            if (m_debug_projective_error) {
+                cv::Mat imright, imleft;
+                cv_image_right.copyTo(imright);
+                cv_image_left.copyTo(imleft);
+                for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
+                    const auto u_left = PX2u(m_P_L_eig, res_pts_3d[i]);
+                    const auto u_right = PX2u(m_P_R_eig, res_pts_3d[i]);
+
+                    cv::circle(imleft, u_left, 1, colors[i], 2);
+                    cv::circle(imright, u_right, 1, colors[i], 2);
+                    cv::line(imleft, u_left, kpts_filtered_1[i], colors[i], 2);
+                    cv::line(imright, u_right, kpts_filtered_2[i], colors[i], 2);
+                }
+                m_pub_im_left_debug.publish(cv_bridge::CvImage(std_msgs::Header(), "bgr8", imleft).toImageMsg());
+                m_pub_im_right_debug.publish(cv_bridge::CvImage(std_msgs::Header(), "bgr8", imright).toImageMsg());
             }
             m_pub_markarray.publish(markerarr);
             res_pts_3d.emplace_back(m_o1_3d.x, m_o1_3d.y, m_o1_3d.z);
@@ -440,10 +465,10 @@ namespace camera_localisation {
         return m1;
     }
 
-    std::vector<cv::Point3d> CameraLocalisation::triangulate_points(const Eigen::Matrix<double, 3, 4> &P1,
-                                                                    const Eigen::Matrix<double, 3, 4> &P2,
-                                                                    const std::vector<cv::Point2d> &u1,
-                                                                    const std::vector<cv::Point2d> &u2) {
+    std::vector<cv::Point3d> CameraLocalisation::triangulate_tdv(const Eigen::Matrix<double, 3, 4> &P1,
+                                                                 const Eigen::Matrix<double, 3, 4> &P2,
+                                                                 const std::vector<cv::Point2d> &u1,
+                                                                 const std::vector<cv::Point2d> &u2) {
         std::vector<cv::Point3d> res;
         Eigen::Matrix<double, 4, 4> D;
         for (size_t i = 0; i < u1.size(); ++i) {
@@ -451,7 +476,7 @@ namespace camera_localisation {
             D.row(1) = P1.row(2) * u1[i].y - P1.row(1);
             D.row(2) = P2.row(2) * u2[i].x - P2.row(0);
             D.row(3) = P2.row(2) * u2[i].y - P2.row(1);
-            Eigen::JacobiSVD<Eigen::Matrix<double, 4, 4>, Eigen::ComputeThinU | Eigen::ComputeThinV> svd(D);
+            Eigen::JacobiSVD < Eigen::Matrix < double, 4, 4 >, Eigen::ComputeThinU | Eigen::ComputeThinV > svd(D);
             auto X = svd.matrixV().bottomRows<1>();
 //            std::cout << X << std::endl;
             res.emplace_back(X.x() / X.w(), X.y() / X.w(), X.z() / X.w());
@@ -485,9 +510,9 @@ namespace camera_localisation {
         sensor_msgs::PointCloud2Iterator<float> out_x(cloud, "x");
         sensor_msgs::PointCloud2Iterator<float> out_y(cloud, "y");
         sensor_msgs::PointCloud2Iterator<float> out_z(cloud, "z");
-        sensor_msgs::PointCloud2Iterator<uint8_t> out_r(cloud, "r");
-        sensor_msgs::PointCloud2Iterator<uint8_t> out_g(cloud, "g");
-        sensor_msgs::PointCloud2Iterator<uint8_t> out_b(cloud, "b");
+        sensor_msgs::PointCloud2Iterator <uint8_t> out_r(cloud, "r");
+        sensor_msgs::PointCloud2Iterator <uint8_t> out_g(cloud, "g");
+        sensor_msgs::PointCloud2Iterator <uint8_t> out_b(cloud, "b");
 
         for (size_t i = 0; i < pts.size(); ++i, ++out_x, ++out_y, ++out_z, ++out_r, ++out_g, ++out_b) {
             //get the image coordinate for this point and convert to mm

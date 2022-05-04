@@ -56,6 +56,15 @@ inline Eigen::Matrix<typename Derived::Scalar, 3, 3> sqs(const Eigen::MatrixBase
             vec[2], 0.0, -vec[0], -vec[1], vec[0], 0.0).finished();
 }
 
+Eigen::Matrix3d f2K33(const boost::array<double, 12> &P_in) {
+    Eigen::Matrix3d K_out = Eigen::Matrix3d::Identity();
+    K_out(0, 0) = P_in[0];
+    K_out(0, 2) = P_in[2];
+    K_out(1, 1) = P_in[5];
+    K_out(1, 2) = P_in[6];
+    return K_out;
+}
+
 inline Eigen::Vector3d cross(const Eigen::Vector3d &a, const Eigen::Vector3d &b) {
     return {a.y() * b.z() - a.z() * b.y(),
             a.z() * b.x() - a.x() * b.z(),
@@ -88,6 +97,14 @@ inline Eigen::Vector3d cross(const Eigen::Vector3d &a, const Eigen::Vector3d &b)
     p.z() /= div;
 }
 
+cv::Point2d PX2u(const Eigen::Matrix<double, 3, 4> &P,
+                 const Eigen::Vector3d &x) {
+    Eigen::Matrix<double, 4, 1> homogenous_3d(x.x(), x.y(), x.z(), 1.0);
+    Eigen::Vector3d homogenous_2d = P * Eigen::Vector4d{x.x(), x.y(), x.z(), 1};
+    normalize_point(homogenous_2d);
+    return {homogenous_2d.x(), homogenous_2d.y()};
+}
+
 namespace camera_localisation {
 
 /* class CameraLocalisation //{ */
@@ -105,6 +122,7 @@ namespace camera_localisation {
         bool m_debug_matches;
         bool m_debug_epipolar;
         bool m_debug_markers;
+        bool m_debug_projective_error;
 
         /* ros parameters */
         std::string m_uav_name;
@@ -116,12 +134,13 @@ namespace camera_localisation {
 
         // | --------------------- Opencv transformer -------------------- |
         geometry_msgs::TransformStamped m_RL_transform, m_LR_transform;
-        cv::Mat m_P_L, m_P_R;
-        Eigen::Matrix<double, 3, 4> m_eig_P_R, m_eig_P_L;
+        cv::Mat m_P_L_cv, m_P_R_cv;
+        Eigen::Matrix<double, 3, 4> m_P_R_eig, m_P_L_eig;
 
         cv::Ptr<cv::BFMatcher> matcher = cv::BFMatcher::create(cv::NORM_HAMMING, true);
         cv::Ptr<cv::Feature2D> detector;
-        cv::Mat m_K_CL, m_K_CR;
+        Eigen::Matrix<double, 3, 3> m_K_CL_eig, m_K_CR_eig;
+        cv::Mat m_K_CL_cv, m_K_CR_cv;
         float m_distance_ratio;
         size_t m_distance_threshold;
         // TODO: generalize
@@ -144,8 +163,8 @@ namespace camera_localisation {
 
         ros::Publisher m_pub_im_corresp;
         ros::Publisher m_pub_markarray;
-        ros::Publisher m_pub_im_left_epipolar;
-        ros::Publisher m_pub_im_right_epipolar;
+        ros::Publisher m_pub_im_left_debug;
+        ros::Publisher m_pub_im_right_debug;
         ros::Publisher m_pub_pcld;
 
         // | ----------------------- subscribers ---------------------- |
@@ -183,10 +202,10 @@ namespace camera_localisation {
                                              std::vector<cv::Point2d> &res_kpts1,
                                              std::vector<cv::Point2d> &res_kpts2);
 
-        [[maybe_unused]] static std::vector<cv::Point3d> triangulate_points(const Eigen::Matrix<double, 3, 4> &P1,
-                                                                            const Eigen::Matrix<double, 3, 4> &P2,
-                                                                            const std::vector<cv::Point2d> &u1,
-                                                                            const std::vector<cv::Point2d> &u2);
+        [[maybe_unused]] static std::vector<cv::Point3d> triangulate_tdv(const Eigen::Matrix<double, 3, 4> &P1,
+                                                                         const Eigen::Matrix<double, 3, 4> &P2,
+                                                                         const std::vector<cv::Point2d> &u1,
+                                                                         const std::vector<cv::Point2d> &u2);
 
         [[maybe_unused]] sensor_msgs::PointCloud2 pts_to_cloud(const std::vector<Eigen::Vector3d> &pts);
 
