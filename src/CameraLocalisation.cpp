@@ -249,7 +249,15 @@ namespace camera_localisation {
             int counter = 0;
 
             //        Primitive triangulation
-            auto res_pts_3d = triangulate_primitive(kpts_filtered_1, kpts_filtered_2);
+//            auto res_pts_3d = triangulate_primitive(kpts_filtered_1, kpts_filtered_2);
+            cv::Mat res_4d_homogenous;
+            try {
+                cv::triangulatePoints(m_P_L_cv, m_P_R_cv, kpts_filtered_1, kpts_filtered_2, res_4d_homogenous);
+            } catch (cv::Exception &e) {
+                std::cout << e.what() << std::endl;
+            }
+//            auto res_pts_3d = triangulate_tdv(m_P_L_eig, m_P_R_eig, kpts_filtered_1, kpts_filtered_2);
+            auto res_pts_3d = X2td(res_4d_homogenous);
             std::vector<cv::Scalar> colors;
             if (m_debug_markers) {
                 for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
@@ -465,18 +473,18 @@ namespace camera_localisation {
         return m1;
     }
 
-    std::vector<cv::Point3d> CameraLocalisation::triangulate_tdv(const Eigen::Matrix<double, 3, 4> &P1,
-                                                                 const Eigen::Matrix<double, 3, 4> &P2,
-                                                                 const std::vector<cv::Point2d> &u1,
-                                                                 const std::vector<cv::Point2d> &u2) {
-        std::vector<cv::Point3d> res;
+    std::vector<Eigen::Vector3d> CameraLocalisation::triangulate_tdv(const Eigen::Matrix<double, 3, 4> &P1,
+                                                                     const Eigen::Matrix<double, 3, 4> &P2,
+                                                                     const std::vector<cv::Point2d> &u1,
+                                                                     const std::vector<cv::Point2d> &u2) {
+        std::vector<Eigen::Vector3d> res;
         Eigen::Matrix<double, 4, 4> D;
         for (size_t i = 0; i < u1.size(); ++i) {
             D.row(0) = P1.row(2) * u1[i].x - P1.row(0);
             D.row(1) = P1.row(2) * u1[i].y - P1.row(1);
             D.row(2) = P2.row(2) * u2[i].x - P2.row(0);
             D.row(3) = P2.row(2) * u2[i].y - P2.row(1);
-            Eigen::JacobiSVD < Eigen::Matrix < double, 4, 4 >, Eigen::ComputeThinU | Eigen::ComputeThinV > svd(D);
+            Eigen::JacobiSVD<Eigen::Matrix<double, 4, 4>, Eigen::ComputeThinU | Eigen::ComputeThinV> svd(D);
             auto X = svd.matrixV().bottomRows<1>();
 //            std::cout << X << std::endl;
             res.emplace_back(X.x() / X.w(), X.y() / X.w(), X.z() / X.w());
@@ -510,9 +518,9 @@ namespace camera_localisation {
         sensor_msgs::PointCloud2Iterator<float> out_x(cloud, "x");
         sensor_msgs::PointCloud2Iterator<float> out_y(cloud, "y");
         sensor_msgs::PointCloud2Iterator<float> out_z(cloud, "z");
-        sensor_msgs::PointCloud2Iterator <uint8_t> out_r(cloud, "r");
-        sensor_msgs::PointCloud2Iterator <uint8_t> out_g(cloud, "g");
-        sensor_msgs::PointCloud2Iterator <uint8_t> out_b(cloud, "b");
+        sensor_msgs::PointCloud2Iterator<uint8_t> out_r(cloud, "r");
+        sensor_msgs::PointCloud2Iterator<uint8_t> out_g(cloud, "g");
+        sensor_msgs::PointCloud2Iterator<uint8_t> out_b(cloud, "b");
 
         for (size_t i = 0; i < pts.size(); ++i, ++out_x, ++out_y, ++out_z, ++out_r, ++out_g, ++out_b) {
             //get the image coordinate for this point and convert to mm

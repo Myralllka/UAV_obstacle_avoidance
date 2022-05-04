@@ -105,6 +105,18 @@ cv::Point2d PX2u(const Eigen::Matrix<double, 3, 4> &P,
     return {homogenous_2d.x(), homogenous_2d.y()};
 }
 
+std::vector<Eigen::Vector3d> X2td(const cv::Mat &input) {
+    std::vector<Eigen::Vector3d> res;
+    for (int i = 0; i < input.cols; ++i) {
+        const auto x = input.at<double>(0, i);
+        const auto y = input.at<double>(1, i);
+        const auto z = input.at<double>(2, i);
+        const auto w = input.at<double>(3, i);
+        res.emplace_back(x / w, y / w, z / w);
+    }
+    return res;
+}
+
 namespace camera_localisation {
 
 /* class CameraLocalisation //{ */
@@ -202,10 +214,10 @@ namespace camera_localisation {
                                              std::vector<cv::Point2d> &res_kpts1,
                                              std::vector<cv::Point2d> &res_kpts2);
 
-        [[maybe_unused]] static std::vector<cv::Point3d> triangulate_tdv(const Eigen::Matrix<double, 3, 4> &P1,
-                                                                         const Eigen::Matrix<double, 3, 4> &P2,
-                                                                         const std::vector<cv::Point2d> &u1,
-                                                                         const std::vector<cv::Point2d> &u2);
+        [[maybe_unused]] static std::vector<Eigen::Vector3d> triangulate_tdv(const Eigen::Matrix<double, 3, 4> &P1,
+                                                                             const Eigen::Matrix<double, 3, 4> &P2,
+                                                                             const std::vector<cv::Point2d> &u1,
+                                                                             const std::vector<cv::Point2d> &u2);
 
         [[maybe_unused]] sensor_msgs::PointCloud2 pts_to_cloud(const std::vector<Eigen::Vector3d> &pts);
 
