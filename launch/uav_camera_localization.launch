@@ -16,7 +16,7 @@
     <arg if="$(arg debug)" name="launch_prefix_debug" value="debug_roslaunch"/>
 
     <!-- will it run as standalone nodelet or using a nodelet manager? -->
-    <arg name="manager" default="$(arg UAV_NAME)_uav_camera_localisation_manager"/>
+    <arg name="manager" default="$(arg UAV_NAME)_uav_camera_localization_manager"/>
     <arg if="$(arg standalone)" name="nodelet" value="standalone"/>
     <arg unless="$(arg standalone)" name="nodelet" value="load"/>
     <arg if="$(arg standalone)" name="nodelet_manager" value=""/>
@@ -31,8 +31,8 @@
         <!-- ClASS_NAME nodelet -->
         <node pkg="nodelet"
               type="nodelet"
-              name="camera_localisation"
-              args="$(arg nodelet) camera_localisation/CameraLocalisation $(arg nodelet_manager)"
+              name="camera_localization"
+              args="$(arg nodelet) camera_localization/CameraLocalization $(arg nodelet_manager)"
               launch-prefix="$(arg launch_prefix_debug)"
               output="screen">
 
@@ -45,10 +45,10 @@
             <param name="m_name_CR" type="string" value="uav1/basler_right_optical"/>
             <param name="camera1_fleft_pose" type="string" value="$(arg camera1_fleft_pose)"/>
             <param name="camera2_fright_pose" type="string" value="$(arg camera2_fright_pose)"/>
-            <rosparam file="$(find uav_camera_localisation)/config/general.yaml"/>
-            <rosparam file="$(find uav_camera_localisation)/config/cameras_roi.yaml"/>
+            <rosparam file="$(find uav_camera_localization)/config/general.yaml"/>
+            <rosparam file="$(find uav_camera_localization)/config/cameras_roi.yaml"/>
             <!-- ROS parameters config file -->
-            <rosparam file="$(find uav_camera_localisation)/config/cameras_roi.yaml"/>
+            <rosparam file="$(find uav_camera_localization)/config/cameras_roi.yaml"/>
 
             <!-- Subscribers (note that the topic names will also be remapped using the namespace as a prefix) -->
 

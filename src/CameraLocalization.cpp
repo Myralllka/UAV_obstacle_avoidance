@@ -1,12 +1,12 @@
-#include <CameraLocalisation.h>
+#include <CameraLocalization.h>
 
 /* every nodelet must include macros which export the class as a nodelet plugin */
 #include <pluginlib/class_list_macros.h>
 
-namespace camera_localisation {
+namespace camera_localization {
 
 /* onInit() method //{ */
-    void CameraLocalisation::onInit() {
+    void CameraLocalization::onInit() {
 
         // | ---------------- set my booleans to false ---------------- |
 
@@ -58,10 +58,10 @@ namespace camera_localisation {
         detector = cv::ORB::create(n_features);
         // intrinsic camera parameters (calibration matrices)
         if (!pl.loadedSuccessfully()) {
-            ROS_ERROR("[CameraLocalisation]: failed to load non-optional parameters!");
+            ROS_ERROR("[CameraLocalization]: failed to load non-optional parameters!");
             ros::shutdown();
         } else {
-            ROS_INFO_ONCE("[CameraLocalisation]: loaded parameters");
+            ROS_INFO_ONCE("[CameraLocalization]: loaded parameters");
         }
         // | ---------------- some data post-processing --------------- |
 
@@ -77,12 +77,12 @@ namespace camera_localisation {
         // | ---------------- subscribers initialize ------------------ |
 
         // | --------------------- tf transformer --------------------- |
-        m_transformer = mrs_lib::Transformer("CameraLocalisation");
+        m_transformer = mrs_lib::Transformer("CameraLocalization");
         m_transformer.setDefaultPrefix(m_uav_name);
 
         // | -------------------- initialize timers ------------------- |
         m_tim_corresp = nh.createTimer(ros::Duration(0.0001),
-                                       &CameraLocalisation::m_tim_cbk_corresp,
+                                       &CameraLocalization::m_tim_cbk_corresp,
                                        this);
 
         // | -------------------- other static preperation ------------------- |
@@ -121,12 +121,12 @@ namespace camera_localisation {
 //        find base-to-right camera and base-to-left camera transformations
         ros::Duration(1.0).sleep();
         setUp();
-        ROS_INFO_ONCE("[CameraLocalisation]: initialized");
+        ROS_INFO_ONCE("[CameraLocalization]: initialized");
         m_is_initialized = true;
     }
 //}
 
-    void CameraLocalisation::setUp() {
+    void CameraLocalization::setUp() {
 
         auto m_fright_pose_opt = m_transformer.getTransform(m_name_CR, m_name_base);
         if (m_fright_pose_opt.has_value()) {
@@ -190,7 +190,7 @@ namespace camera_localisation {
 
 // | --------------------- timer callbacks -------------------- |
 
-    void CameraLocalisation::m_tim_cbk_corresp([[maybe_unused]] const ros::TimerEvent &ev) {
+    void CameraLocalization::m_tim_cbk_corresp([[maybe_unused]] const ros::TimerEvent &ev) {
         if (not m_is_initialized) return;
 
         if (m_handler_imleft.newMsg() and m_handler_imright.newMsg()) {
@@ -304,7 +304,7 @@ namespace camera_localisation {
 // | -------------------- other functions ------------------- |
 
     // ===================== UTILS =====================
-    std::vector<Eigen::Vector3d> CameraLocalisation::triangulate_primitive(const std::vector<cv::Point2d> &kpts1,
+    std::vector<Eigen::Vector3d> CameraLocalization::triangulate_primitive(const std::vector<cv::Point2d> &kpts1,
                                                                            const std::vector<cv::Point2d> &kpts2) {
         std::vector<Eigen::Vector3d> res_pc;
         for (size_t i = 0; i < kpts1.size(); ++i) {
@@ -327,7 +327,7 @@ namespace camera_localisation {
         return res_pc;
     }
 
-    void CameraLocalisation::m_detect_and_compute_kpts(const cv::Mat &img,
+    void CameraLocalization::m_detect_and_compute_kpts(const cv::Mat &img,
                                                        const cv::Mat &mask,
                                                        std::vector<cv::KeyPoint> &res_kpts,
                                                        cv::Mat &res_desk) {
@@ -341,7 +341,7 @@ namespace camera_localisation {
                                    res_desk);
     }
 
-    void CameraLocalisation::filter_matches(const std::vector<cv::DMatch> &input_matches,
+    void CameraLocalization::filter_matches(const std::vector<cv::DMatch> &input_matches,
                                             const std::vector<cv::KeyPoint> &kpts1,
                                             const std::vector<cv::KeyPoint> &kpts2,
                                             const cv::Point2d &o1_2d,
@@ -389,7 +389,7 @@ namespace camera_localisation {
         }
     }
 
-    Eigen::Vector3d CameraLocalisation::estimate_point_between_rays(const Eigen::Vector3d &o1,
+    Eigen::Vector3d CameraLocalization::estimate_point_between_rays(const Eigen::Vector3d &o1,
                                                                     const Eigen::Vector3d &o2,
                                                                     const Eigen::Vector3d &r1,
                                                                     const Eigen::Vector3d &r2) {
@@ -416,7 +416,7 @@ namespace camera_localisation {
     }
 
     visualization_msgs::Marker
-    CameraLocalisation::create_marker_ray(const Eigen::Vector3d &pt,
+    CameraLocalization::create_marker_ray(const Eigen::Vector3d &pt,
                                           const Eigen::Vector3d &O,
                                           const std::string &cam_name,
                                           const int id,
@@ -450,7 +450,7 @@ namespace camera_localisation {
     }
 
     visualization_msgs::Marker
-    CameraLocalisation::create_marker_pt(const Eigen::Vector3d &pt,
+    CameraLocalization::create_marker_pt(const Eigen::Vector3d &pt,
                                          const int id,
                                          const cv::Scalar &color) {
         visualization_msgs::Marker m1;
@@ -473,7 +473,7 @@ namespace camera_localisation {
         return m1;
     }
 
-    std::vector<Eigen::Vector3d> CameraLocalisation::triangulate_tdv(const Eigen::Matrix<double, 3, 4> &P1,
+    std::vector<Eigen::Vector3d> CameraLocalization::triangulate_tdv(const Eigen::Matrix<double, 3, 4> &P1,
                                                                      const Eigen::Matrix<double, 3, 4> &P2,
                                                                      const std::vector<cv::Point2d> &u1,
                                                                      const std::vector<cv::Point2d> &u2) {
@@ -493,7 +493,7 @@ namespace camera_localisation {
     }
 
     //convert point cloud image to ros message
-    sensor_msgs::PointCloud2 CameraLocalisation::pts_to_cloud(const std::vector<Eigen::Vector3d> &pts) {
+    sensor_msgs::PointCloud2 CameraLocalization::pts_to_cloud(const std::vector<Eigen::Vector3d> &pts) {
         //rgb is a cv::Mat with 3 color channels of size 640x480
         //coords is a cv::Mat with xyz channels of size 640x480, units in mm from calibration
 
@@ -539,7 +539,7 @@ namespace camera_localisation {
         return cloud;
     }
 
-    [[maybe_unused]] cv::Scalar CameraLocalisation::generate_random_color() {
+    [[maybe_unused]] cv::Scalar CameraLocalization::generate_random_color() {
         std::random_device rd;
         std::mt19937 generator(rd());
         std::uniform_int_distribution<uint8_t> distribution{0, 255};
@@ -550,7 +550,7 @@ namespace camera_localisation {
         return cv::Scalar(b, g, r);
     }
 
-    [[maybe_unused]] void CameraLocalisation::draw_epipolar_line(cv::Mat &img,
+    [[maybe_unused]] void CameraLocalization::draw_epipolar_line(cv::Mat &img,
                                                                  std::vector<cv::Point3f> &line,
                                                                  const std::vector<cv::Point2f> &pts) {
         // source https://docs.opencv.org/3.4/da/de9/tutorial_py_epipolar_geometry.html
@@ -576,7 +576,7 @@ namespace camera_localisation {
         }
     }
 
-}  // namespace camera_localisation
+}  // namespace camera_localization
 
 /* every nodelet must export its class as nodelet plugin */
-PLUGINLIB_EXPORT_CLASS(camera_localisation::CameraLocalisation, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(camera_localization::CameraLocalization, nodelet::Nodelet)

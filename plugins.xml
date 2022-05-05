@@ -1,5 +1,5 @@
-<library path="lib/libCameraLocalisation">
-  <class name="camera_localisation/CameraLocalisation" type="camera_localisation::CameraLocalisation" base_class_type="nodelet::Nodelet">
-    <description>uav_camera_localisation nodelet</description>
+<library path="lib/libCameraLocalization">
+  <class name="camera_localization/CameraLocalization" type="camera_localization::CameraLocalization" base_class_type="nodelet::Nodelet">
+    <description>uav_camera_localization nodelet</description>
   </class>
 </library>

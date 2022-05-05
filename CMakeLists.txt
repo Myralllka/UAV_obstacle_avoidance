@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1.2)
-project(uav_camera_localisation)
+project(uav_camera_localization)
 
-set(FILESNAME CameraLocalisation)
+set(FILESNAME CameraLocalization)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

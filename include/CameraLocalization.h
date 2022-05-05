@@ -117,10 +117,10 @@ std::vector<Eigen::Vector3d> X2td(const cv::Mat &input) {
     return res;
 }
 
-namespace camera_localisation {
+namespace camera_localization {
 
-/* class CameraLocalisation //{ */
-    class CameraLocalisation : public nodelet::Nodelet {
+/* class Cameralocalization //{ */
+    class CameraLocalization : public nodelet::Nodelet {
 
     public:
         /* onInit() is called when nodelet is launched (similar to main() in regular node) */
@@ -128,7 +128,7 @@ namespace camera_localisation {
 
     private:
 
-        const std::string NODENAME{"CameraLocalisation"};
+        const std::string NODENAME{"CameraLocalization"};
         /* flags */
         bool m_is_initialized = false;
         bool m_debug_matches;
@@ -244,4 +244,4 @@ namespace camera_localisation {
     };
 //}
 
-}  // namespace camera_localisation
+}  // namespace camera_localization

@@ -15,8 +15,8 @@ windows:
       panes:
   #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fleft/tag_detections_image
   #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fright/tag_detections_image
-          - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localisation/left_debug
-          - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localisation/right_debug
+          - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localization/left_debug
+          - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localization/right_debug
 #          - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/im_corresp
   - rviz:
       layout: tiled
@@ -30,12 +30,12 @@ windows:
 #  - epipolar_lines:
 #      layout: even-horizontal
 #      panes:
-#        - waitForRos; rosrun uav_camera_localisation scripts/epipolar_line.py
+#        - waitForRos; rosrun uav_camera_localization scripts/epipolar_line.py
 #  - corresp:
 #      layout: tiled
 #      panes:
-#        - waitForRos; rosrun uav_camera_localisation scripts/correspondences.py
-  - uav_camera_localisation:
+#        - waitForRos; rosrun uav_camera_localization scripts/correspondences.py
+  - uav_camera_localization:
       layout: tiled
       panes:
-        - waitForRos; roslaunch uav_camera_localisation uav_camera_localisation.launch
+        - waitForRos; roslaunch uav_camera_localization uav_camera_localization.launch

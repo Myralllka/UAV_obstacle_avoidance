@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
 
-  <name>uav_camera_localisation</name>
+  <name>uav_camera_localization</name>
   <version>1.0.0</version>
   <description>more_desctription</description>
 
