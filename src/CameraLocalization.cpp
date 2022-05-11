@@ -250,6 +250,7 @@ namespace camera_localization {
 
             //        Primitive triangulation
 //            auto res_pts_3d = triangulate_primitive(kpts_filtered_1, kpts_filtered_2);
+            // Opencv triangulation
             cv::Mat res_4d_homogenous;
             try {
                 cv::triangulatePoints(m_P_L_cv, m_P_R_cv, kpts_filtered_1, kpts_filtered_2, res_4d_homogenous);
