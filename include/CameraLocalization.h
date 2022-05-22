@@ -42,80 +42,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/eigen.hpp>
 
+#include "Utils.h"
 //}
-template<typename T>
-T deg2rad(const T x) { return x * M_PI / 180; }
-
-template<typename T>
-T rad2deg(const T x) { return x / M_PI * 180; }
-
-template<class Derived>
-inline Eigen::Matrix<typename Derived::Scalar, 3, 3> sqs(const Eigen::MatrixBase<Derived> &vec) {
-    EIGEN_STATIC_ASSERT_VECTOR_SPECIFIC_SIZE(Derived, 3)
-    return (Eigen::Matrix<typename Derived::Scalar, 3, 3>() << 0.0, -vec[2], vec[1],
-            vec[2], 0.0, -vec[0], -vec[1], vec[0], 0.0).finished();
-}
-
-Eigen::Matrix3d f2K33(const boost::array<double, 12> &P_in) {
-    Eigen::Matrix3d K_out = Eigen::Matrix3d::Identity();
-    K_out(0, 0) = P_in[0];
-    K_out(0, 2) = P_in[2];
-    K_out(1, 1) = P_in[5];
-    K_out(1, 2) = P_in[6];
-    return K_out;
-}
-
-inline Eigen::Vector3d cross(const Eigen::Vector3d &a, const Eigen::Vector3d &b) {
-    return {a.y() * b.z() - a.z() * b.y(),
-            a.z() * b.x() - a.x() * b.z(),
-            a.x() * b.y() - a.y() * b.x()};
-}
-
-[[maybe_unused]] std::pair<cv::Point2d, cv::Point2d> line2image(const cv::Point3d &line, int imwidth) {
-    auto x0 = .0f;
-    auto x1 = static_cast<double>(imwidth);
-    double l0 = line.x;
-    double l1 = line.y;
-    double l2 = line.z;
-    double y0 = -l2 / l1;
-    double y1 = -(l2 + l0 * imwidth) / l1;
-
-    return {cv::Point{static_cast<int>(std::round(x0)), static_cast<int>(std::ceil(y0))},
-            cv::Point{static_cast<int>(std::round(x1)), static_cast<int>(std::ceil(y1))}};
-}
-
-[[maybe_unused]] inline void normalize_point(Eigen::Vector3d &p) {
-    p.x() /= p.z();
-    p.y() /= p.z();
-    p.z() /= p.z();
-}
-
-[[maybe_unused]] inline void normalize_line(Eigen::Vector3d &p) {
-    auto div = std::sqrt(std::pow(p.x(), 2) + std::pow(p.y(), 2));
-    p.x() /= div;
-    p.y() /= div;
-    p.z() /= div;
-}
-
-cv::Point2d PX2u(const Eigen::Matrix<double, 3, 4> &P,
-                 const Eigen::Vector3d &x) {
-    Eigen::Matrix<double, 4, 1> homogenous_3d(x.x(), x.y(), x.z(), 1.0);
-    Eigen::Vector3d homogenous_2d = P * Eigen::Vector4d{x.x(), x.y(), x.z(), 1};
-    normalize_point(homogenous_2d);
-    return {homogenous_2d.x(), homogenous_2d.y()};
-}
-
-std::vector<Eigen::Vector3d> X2td(const cv::Mat &input) {
-    std::vector<Eigen::Vector3d> res;
-    for (int i = 0; i < input.cols; ++i) {
-        const auto x = input.at<double>(0, i);
-        const auto y = input.at<double>(1, i);
-        const auto z = input.at<double>(2, i);
-        const auto w = input.at<double>(3, i);
-        res.emplace_back(x / w, y / w, z / w);
-    }
-    return res;
-}
 
 namespace camera_localization {
 
@@ -133,8 +61,9 @@ namespace camera_localization {
         bool m_is_initialized = false;
         bool m_debug_matches;
         bool m_debug_epipolar;
+        bool m_debug_distances;
         bool m_debug_markers;
-        bool m_debug_projective_error;
+        bool m_debug_projection_error;
 
         /* ros parameters */
         std::string m_uav_name;
@@ -143,6 +72,7 @@ namespace camera_localization {
         std::string m_name_base;
         std::string m_name_CL;
         std::string m_name_CR;
+        std::string m_method_triang;
 
         // | --------------------- Opencv transformer -------------------- |
         geometry_msgs::TransformStamped m_RL_transform, m_LR_transform;
@@ -225,12 +155,6 @@ namespace camera_localization {
                                                                      const Eigen::Vector3d &o2,
                                                                      const Eigen::Vector3d &r1,
                                                                      const Eigen::Vector3d &r2);
-
-        [[maybe_unused]] visualization_msgs::Marker create_marker_ray(const Eigen::Vector3d &pt,
-                                                                      const Eigen::Vector3d &O,
-                                                                      const std::string &cam_name,
-                                                                      const int id,
-                                                                      const cv::Scalar &color);
 
         [[maybe_unused]] visualization_msgs::Marker create_marker_pt(const Eigen::Vector3d &pt,
                                                                      const int id,

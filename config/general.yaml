@@ -6,3 +6,6 @@ corresp:
   debug_epipolar: true
   debug_markers: true
   debug_projective_error: true
+  debug_distances: true
+  # triangulation method can be so-called primitive or svd
+  triangulation_method: "svd"

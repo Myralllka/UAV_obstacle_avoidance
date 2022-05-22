@@ -38,9 +38,10 @@ namespace camera_localization {
 
         // booleans for debug control
         pl.loadParam("corresp/debug_epipolar", m_debug_epipolar);
+        pl.loadParam("corresp/debug_distances", m_debug_distances);
         pl.loadParam("corresp/debug_matches", m_debug_matches);
         pl.loadParam("corresp/debug_markers", m_debug_markers);
-        pl.loadParam("corresp/debug_projective_error", m_debug_projective_error);
+        pl.loadParam("corresp/debug_projective_error", m_debug_projection_error);
 
         // image matching and filtering parameters
         int tmp_thr;
@@ -56,12 +57,18 @@ namespace camera_localization {
         int n_features;
         pl.loadParam("corresp/n_features", n_features);
         detector = cv::ORB::create(n_features);
+        // load the triangulation method
+        pl.loadParam("corresp/triangulation_method", m_method_triang);
+        if (not(m_method_triang == "svd" or m_method_triang == "primitive")) {
+            ROS_ERROR("[%s]: wrong triangulation method", NODENAME.c_str());
+        }
+
         // intrinsic camera parameters (calibration matrices)
         if (!pl.loadedSuccessfully()) {
-            ROS_ERROR("[CameraLocalization]: failed to load non-optional parameters!");
+            ROS_ERROR("[%s]: failed to load non-optional parameters!", NODENAME.c_str());
             ros::shutdown();
         } else {
-            ROS_INFO_ONCE("[CameraLocalization]: loaded parameters");
+            ROS_INFO_ONCE("[%s]: loaded parameters", NODENAME.c_str());
         }
         // | ---------------- some data post-processing --------------- |
 
@@ -218,7 +225,7 @@ namespace camera_localization {
                            descriptor2,
                            matches,
                            cv::Mat());
-//            drop bad matches
+            // drop bad matches
             std::sort(matches.begin(), matches.end());
             const int num_good_matches = static_cast<int>(std::round(static_cast<double>(matches.size()) *
                                                                      m_distance_ratio));
@@ -247,50 +254,90 @@ namespace camera_localization {
             auto markerarr = boost::make_shared<visualization_msgs::MarkerArray>();
             Eigen::Vector3d O{0, 0, 0};
             int counter = 0;
-
-            //        Primitive triangulation
-//            auto res_pts_3d = triangulate_primitive(kpts_filtered_1, kpts_filtered_2);
-            // Opencv triangulation
-            cv::Mat res_4d_homogenous;
-            try {
-                cv::triangulatePoints(m_P_L_cv, m_P_R_cv, kpts_filtered_1, kpts_filtered_2, res_4d_homogenous);
-            } catch (cv::Exception &e) {
-                std::cout << e.what() << std::endl;
+            std::vector<Eigen::Vector3d> res_pts_3d;
+            if (m_method_triang == "svd") {
+                cv::Mat res_4d_homogenous;
+                try {
+                    cv::triangulatePoints(m_P_L_cv, m_P_R_cv, kpts_filtered_1, kpts_filtered_2, res_4d_homogenous);
+                } catch (cv::Exception &e) {
+                    std::cout << e.what() << std::endl;
+                    return;
+                }
+                res_pts_3d = X2td(res_4d_homogenous);
+            } else if (m_method_triang == "primitive") {
+                res_pts_3d = triangulate_primitive(kpts_filtered_1, kpts_filtered_2);
+            } else {
+                ROS_ERROR("[%s]: unknown triangulation method", NODENAME.c_str());
+                ros::shutdown();
             }
-//            auto res_pts_3d = triangulate_tdv(m_P_L_eig, m_P_R_eig, kpts_filtered_1, kpts_filtered_2);
-            auto res_pts_3d = X2td(res_4d_homogenous);
             std::vector<cv::Scalar> colors;
+            for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
+                const auto color = generate_random_color();
+                colors.push_back(color);
+            }
+
             if (m_debug_markers) {
                 for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
-                    const auto color = generate_random_color();
-                    colors.push_back(color);
-
                     const auto cv_ray1 = m_camera_left.projectPixelTo3dRay(kpts_filtered_1[i]);
                     const auto cv_ray2 = m_camera_right.projectPixelTo3dRay(kpts_filtered_2[i]);
                     const Eigen::Vector3d eigen_vec1{cv_ray1.x, cv_ray1.y, cv_ray1.z};
                     const Eigen::Vector3d eigen_vec2{cv_ray2.x, cv_ray2.y, cv_ray2.z};
 
-                    markerarr->markers.emplace_back(create_marker_ray(eigen_vec1, O, m_name_CL, counter++, color));
-                    markerarr->markers.emplace_back(create_marker_ray(eigen_vec2, O, m_name_CR, counter++, color));
-                    markerarr->markers.push_back(create_marker_pt(res_pts_3d[i], counter++, color));
+                    markerarr->markers.emplace_back(create_marker_ray(eigen_vec1, O, m_name_CL, counter++, colors[i]));
+                    markerarr->markers.emplace_back(create_marker_ray(eigen_vec2, O, m_name_CR, counter++, colors[i]));
+                    markerarr->markers.push_back(create_marker_pt(res_pts_3d[i], counter++, colors[i]));
                 }
             }
-            if (m_debug_projective_error) {
+            if (m_debug_projection_error or m_debug_distances) {
+                double res_total_reprojection_error = 0;
                 cv::Mat imright, imleft;
                 cv_image_right.copyTo(imright);
                 cv_image_left.copyTo(imleft);
-                for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
-                    const auto u_left = PX2u(m_P_L_eig, res_pts_3d[i]);
-                    const auto u_right = PX2u(m_P_R_eig, res_pts_3d[i]);
+                if (m_debug_projection_error) {
+                    for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
+                        const auto u_left = PX2u(m_P_L_eig, res_pts_3d[i]);
+                        const auto u_right = PX2u(m_P_R_eig, res_pts_3d[i]);
 
-                    cv::circle(imleft, u_left, 1, colors[i], 2);
-                    cv::circle(imright, u_right, 1, colors[i], 2);
-                    cv::line(imleft, u_left, kpts_filtered_1[i], colors[i], 2);
-                    cv::line(imright, u_right, kpts_filtered_2[i], colors[i], 2);
+                        cv::circle(imleft, u_left, 1, colors[i], 2);
+                        cv::circle(imright, u_right, 1, colors[i], 2);
+                        cv::line(imleft, u_left, kpts_filtered_1[i], colors[i], 2);
+                        cv::line(imright, u_right, kpts_filtered_2[i], colors[i], 2);
+                        res_total_reprojection_error += reprojection_error(m_P_L_eig, m_P_R_eig,
+                                                                           res_pts_3d[i],
+                                                                           kpts_filtered_1[i],
+                                                                           kpts_filtered_2[i]);
+                    }
+                }
+                if (m_debug_distances) {
+                    for (size_t i = 0; i < res_pts_3d.size(); ++i) {
+                        std::ostringstream out;
+                        out.precision(2);
+                        out << std::fixed << res_pts_3d[i].norm();
+                        cv::putText(imleft,
+                                    out.str(),
+                                    kpts_filtered_1[i],
+                                    cv::FONT_HERSHEY_PLAIN,
+                                    1,
+                                    colors[i],
+                                    2);
+
+                        cv::putText(imright,
+                                    out.str(),
+                                    kpts_filtered_2[i],
+                                    cv::FONT_HERSHEY_PLAIN,
+                                    1,
+                                    colors[i],
+                                    2);
+                    }
                 }
                 m_pub_im_left_debug.publish(cv_bridge::CvImage(std_msgs::Header(), "bgr8", imleft).toImageMsg());
                 m_pub_im_right_debug.publish(cv_bridge::CvImage(std_msgs::Header(), "bgr8", imright).toImageMsg());
+                ROS_INFO("[%s]: TOTAL_REPROJECTION_ERROR = %.2f;\n\t\t\t\t reprojection averaged = %.2f",
+                         NODENAME.c_str(),
+                         res_total_reprojection_error,
+                         res_total_reprojection_error / kpts_filtered_1.size());
             }
+
             m_pub_markarray.publish(markerarr);
             res_pts_3d.emplace_back(m_o1_3d.x, m_o1_3d.y, m_o1_3d.z);
             res_pts_3d.emplace_back(m_o2_3d.x, m_o2_3d.y, m_o2_3d.z);
@@ -417,40 +464,6 @@ namespace camera_localization {
     }
 
     visualization_msgs::Marker
-    CameraLocalization::create_marker_ray(const Eigen::Vector3d &pt,
-                                          const Eigen::Vector3d &O,
-                                          const std::string &cam_name,
-                                          const int id,
-                                          const cv::Scalar &color) {
-        visualization_msgs::Marker m1;
-        m1.header.frame_id = cam_name;
-        m1.header.stamp = ros::Time::now();
-        m1.points.reserve(2);
-        geometry_msgs::Point p1;
-        p1.x = pt.x();
-        p1.y = pt.y();
-        p1.z = pt.z();
-        m1.ns = "rays";
-        m1.id = id;
-        m1.color.a = 1;
-        m1.lifetime = ros::Duration(1.0);
-        m1.color.r = color[0] / 255.0;
-        m1.color.g = color[1] / 255.0;
-        m1.color.b = color[2] / 255.0;
-        geometry_msgs::Point o;
-        o.x = O.x();
-        o.y = O.y();
-        o.z = O.z();
-        m1.points.push_back(o);
-        m1.points.push_back(p1);
-        m1.type = visualization_msgs::Marker::ARROW;
-        m1.scale.x = 0.001;
-        m1.scale.y = 0.01;
-        m1.scale.z = 0;
-        return m1;
-    }
-
-    visualization_msgs::Marker
     CameraLocalization::create_marker_pt(const Eigen::Vector3d &pt,
                                          const int id,
                                          const cv::Scalar &color) {
@@ -486,7 +499,7 @@ namespace camera_localization {
             D.row(2) = P2.row(2) * u2[i].x - P2.row(0);
             D.row(3) = P2.row(2) * u2[i].y - P2.row(1);
             Eigen::JacobiSVD<Eigen::Matrix<double, 4, 4>, Eigen::ComputeThinU | Eigen::ComputeThinV> svd(D);
-            auto X = svd.matrixV().bottomRows<1>();
+            auto X = svd.matrixU().transpose().bottomRows<1>();
 //            std::cout << X << std::endl;
             res.emplace_back(X.x() / X.w(), X.y() / X.w(), X.z() / X.w());
         }
