@@ -100,6 +100,50 @@ namespace camera_localization {
         return m1;
     }
 
+    [[maybe_unused]] visualization_msgs::MarkerArray create_marker_plane(const Eigen::Vector4d &plane_eq,
+                                                                         const std::string &base_name,
+                                                                         const cv::Scalar &color) {
+        const double a = plane_eq.x();
+        const double b = plane_eq.y();
+        const double c = plane_eq.z();
+        const double d = plane_eq.w();
+        visualization_msgs::MarkerArray res;
+        visualization_msgs::Marker m1;
+        m1.header.frame_id = base_name;
+        m1.header.stamp = ros::Time::now();
+        m1.ns = "plane";
+        m1.color.a = 1;
+        m1.lifetime = ros::Duration(1.0);
+        m1.pose.orientation.x = 0.0;
+        m1.pose.orientation.y = 0.0;
+        m1.pose.orientation.z = 0.0;
+        m1.pose.orientation.w = 1.0;
+        m1.color.r = color[0] / 255.0;
+        m1.color.g = color[1] / 255.0;
+        m1.color.b = color[2] / 255.0;
+        m1.type = visualization_msgs::Marker::POINTS;
+        m1.scale.x = 0.01;
+        m1.scale.y = 0.01;
+        m1.scale.z = 0;
+        const float sss = 1;
+        float i = -sss;
+        float j;
+        while (i <= sss) {
+            j = -sss;
+            while (j <= sss) {
+                geometry_msgs::Point p;
+                p.x = i;
+                p.y = j;
+                p.z = (-d - (i * a) - (b * j)) / c;
+                j += 0.05;
+                m1.points.push_back(p);
+            }
+            i += 0.005;
+        }
+        res.markers.push_back(m1);
+        return res;
+    }
+
     inline auto reprojection_error_half(const Eigen::Matrix<double, 3, 4> &P,
                                         const Eigen::Vector3d &X,
                                         const cv::Point2d &m) {
@@ -116,5 +160,60 @@ namespace camera_localization {
                                                const cv::Point2d &m2) {
         return reprojection_error_half(P1, X, m1) +
                reprojection_error_half(P2, X, m2);
+    }
+
+    [[maybe_unused]] std::pair<Eigen::Vector3d, Eigen::Vector3d>
+    best_plane_from_points_SVD(const std::vector<Eigen::Vector3d> &c) {
+        // copy coordinates to  matrix in Eigen format
+        size_t num_atoms = c.size();
+        Eigen::Matrix<Eigen::Vector3d::Scalar, Eigen::Dynamic, Eigen::Dynamic> coord(3, num_atoms);
+        for (size_t i = 0; i < num_atoms; ++i) coord.col(i) = c[i];
+
+        // calculate centroid
+        Eigen::Vector3d centroid(coord.row(0).mean(),
+                                 coord.row(1).mean(),
+                                 coord.row(2).mean());
+        // subtract centroid
+        coord.row(0).array() -= centroid(0);
+        coord.row(1).array() -= centroid(1);
+        coord.row(2).array() -= centroid(2);
+
+        // we only need the left-singular matrix here
+        //  http://math.stackexchange.com/questions/99299/best-fitting-plane-given-a-set-of-points
+        auto svd = coord.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV);
+        Eigen::Vector3d plane_normal = svd.matrixU().rightCols<1>();
+        return std::make_pair(centroid, plane_normal);
+    }
+
+    [[maybe_unused]] std::optional<Eigen::Vector4d>
+    best_plane_from_points_RANSAC(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr &cloud) {
+        pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+        // Create the segmentation object
+        pcl::SACSegmentation<pcl::PointXYZ> seg;
+        // Optional
+        seg.setOptimizeCoefficients(true);
+        // Mandatory
+        seg.setModelType(pcl::SACMODEL_PLANE);
+        seg.setMethodType(pcl::SAC_RANSAC);
+        seg.setDistanceThreshold(0.01);
+
+        seg.setInputCloud(cloud);
+        seg.segment(*inliers, *coefficients);
+
+        if (inliers->indices.empty()) {
+            PCL_ERROR("Could not estimate a planar model for the given dataset.\n");
+            return {};
+        }
+
+        std::cerr << "Model coefficients: " << coefficients->values[0] << " "
+                  << coefficients->values[1] << " "
+                  << coefficients->values[2] << " "
+                  << coefficients->values[3] << std::endl;
+
+        return Eigen::Vector4d{coefficients->values[0],
+                               coefficients->values[1],
+                               coefficients->values[2],
+                               coefficients->values[3]};
     }
 }

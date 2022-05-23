@@ -34,6 +34,14 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
+// PCL
+#include <pcl/ModelCoefficients.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/sample_consensus/model_types.h>
+#include <pcl/segmentation/sac_segmentation.h>
+
 namespace camera_localization {
     template<typename T>
     T deg2rad(const T x) { return x * M_PI / 180; }
@@ -47,6 +55,12 @@ namespace camera_localization {
         return (Eigen::Matrix<typename Derived::Scalar, 3, 3>() << 0.0, -vec[2], vec[1],
                 vec[2], 0.0, -vec[0], -vec[1], vec[0], 0.0).finished();
     }
+
+    [[maybe_unused]] [[maybe_unused]] std::pair<Eigen::Vector3d, Eigen::Vector3d>
+    best_plane_from_points_SVD(const std::vector<Eigen::Vector3d> &c);
+
+    [[maybe_unused]] std::optional<Eigen::Vector4d>
+    best_plane_from_points_RANSAC(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr &cloud);
 
     [[maybe_unused]] double reprojection_error(const Eigen::Matrix<double, 3, 4> &P1,
                                                const Eigen::Matrix<double, 3, 4> &P2,
@@ -76,6 +90,9 @@ namespace camera_localization {
                                                                   const int id,
                                                                   const cv::Scalar &color);
 
+    [[maybe_unused]] visualization_msgs::MarkerArray create_marker_plane(const Eigen::Vector4d &plane_eq,
+                                                                         const std::string &base_name,
+                                                                         const cv::Scalar &color);
 }
 
 

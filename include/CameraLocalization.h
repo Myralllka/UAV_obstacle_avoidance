@@ -31,6 +31,7 @@
 #include <sensor_msgs/point_cloud2_iterator.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <pcl/point_types.h>
 
 /* opencv */
 #include <cv_bridge/cv_bridge.h>
@@ -93,8 +94,9 @@ namespace camera_localization {
         // | --------------------- MRS transformer -------------------- |
 
         mrs_lib::Transformer m_transformer;
-        // | ---------------------- msg callbacks --------------------- |
 
+        // | ---------------------- msg callbacks --------------------- |
+        [[maybe_unused]] void m_cbk_pcl_plane(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr &pts);
         // | --------------------- timer callbacks -------------------- |
 
         ros::Timer m_tim_corresp;
@@ -105,11 +107,13 @@ namespace camera_localization {
 
         ros::Publisher m_pub_im_corresp;
         ros::Publisher m_pub_markarray;
+        ros::Publisher m_pub_markplane;
         ros::Publisher m_pub_im_left_debug;
         ros::Publisher m_pub_im_right_debug;
         ros::Publisher m_pub_pcld;
 
         // | ----------------------- subscribers ---------------------- |
+        ros::Subscriber m_sub_tdpts;
         mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imleft;
         mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imright;
         mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo> m_handler_camleftinfo;

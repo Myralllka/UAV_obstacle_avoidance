@@ -80,8 +80,13 @@ namespace camera_localization {
 
         m_pub_pcld = nh.advertise<sensor_msgs::PointCloud2>("tdpts", 1, true);
         m_pub_markarray = nh.advertise<visualization_msgs::MarkerArray>("markerarray", 1);
+        m_pub_markplane = nh.advertise<visualization_msgs::MarkerArray>("plane", 1);
         m_pub_im_corresp = nh.advertise<sensor_msgs::Image>("im_corresp", 1);
         // | ---------------- subscribers initialize ------------------ |
+        m_sub_tdpts = nh.subscribe("tdpts",
+                                   1,
+                                   &CameraLocalization::m_cbk_pcl_plane,
+                                   this);
 
         // | --------------------- tf transformer --------------------- |
         m_transformer = mrs_lib::Transformer("CameraLocalization");
@@ -193,8 +198,25 @@ namespace camera_localization {
         m_o1_2d = m_camera_right.project3dToPixel(OL_frameR);
         m_o2_2d = m_camera_left.project3dToPixel(OR_frameL);
     }
-// | ---------------------- msg callbacks --------------------- |
 
+// | ---------------------- msg callbacks --------------------- |
+    [[maybe_unused]] void CameraLocalization::m_cbk_pcl_plane(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr &pts) {
+        if (not m_is_initialized) return;
+
+        if (pts->size() < 4) {
+            ROS_ERROR_THROTTLE(1.0, "[%s]: point cloud callback: not enough pts detected!", NODENAME.c_str());
+            return;
+        }
+
+        auto plane_opt = best_plane_from_points_RANSAC(pts);
+        if (plane_opt.has_value()) {
+            Eigen::Vector4d plane = plane_opt.value();
+            m_pub_markplane.publish(create_marker_plane(plane, m_name_base, cv::Scalar(0, 100, 0)));
+        } else {
+            ROS_ERROR_THROTTLE(1.0, "[%s]: point cloud callback: no plane detected!", NODENAME.c_str());
+            return;
+        }
+    }
 // | --------------------- timer callbacks -------------------- |
 
     void CameraLocalization::m_tim_cbk_corresp([[maybe_unused]] const ros::TimerEvent &ev) {
@@ -339,11 +361,11 @@ namespace camera_localization {
             }
 
             m_pub_markarray.publish(markerarr);
-            res_pts_3d.emplace_back(m_o1_3d.x, m_o1_3d.y, m_o1_3d.z);
-            res_pts_3d.emplace_back(m_o2_3d.x, m_o2_3d.y, m_o2_3d.z);
+//            res_pts_3d.emplace_back(m_o1_3d.x, m_o1_3d.y, m_o1_3d.z);
+//            res_pts_3d.emplace_back(m_o2_3d.x, m_o2_3d.y, m_o2_3d.z);
             auto pc = pts_to_cloud(res_pts_3d);
             m_pub_pcld.publish(pc);
-        } else {
+//        } else {
             ROS_WARN_THROTTLE(2.0, "[%s]: No new images to search for correspondences", NODENAME.c_str());
         }
     }
