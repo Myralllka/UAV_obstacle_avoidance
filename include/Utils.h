@@ -42,6 +42,8 @@
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/segmentation/sac_segmentation.h>
 
+#include <numeric>
+
 namespace camera_localization {
     template<typename T>
     T deg2rad(const T x) { return x * M_PI / 180; }
@@ -59,7 +61,7 @@ namespace camera_localization {
     [[maybe_unused]] [[maybe_unused]] std::pair<Eigen::Vector3d, Eigen::Vector3d>
     best_plane_from_points_SVD(const std::vector<Eigen::Vector3d> &c);
 
-    [[maybe_unused]] std::optional<Eigen::Vector4d>
+    [[maybe_unused]] std::optional<std::pair<Eigen::Vector4d, std::vector<int>>>
     best_plane_from_points_RANSAC(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr &cloud);
 
     [[maybe_unused]] double reprojection_error(const Eigen::Matrix<double, 3, 4> &P1,
@@ -93,6 +95,15 @@ namespace camera_localization {
     [[maybe_unused]] visualization_msgs::MarkerArray create_marker_plane(const Eigen::Vector4d &plane_eq,
                                                                          const std::string &base_name,
                                                                          const cv::Scalar &color);
+
+//    [[maybe_unused]] double dist_plane2pt(const Eigen::Vector4d &plane,
+//                                          const Eigen::Vector3d &pt);
+
+    [[maybe_unused]] double dist_plane2pt(const Eigen::Vector4d &plane,
+                                          const pcl::PointXYZ &pt);
+
+    [[maybe_unused]] Eigen::Vector3d closest_pt(const Eigen::Vector4d &plane,
+                                                const Eigen::Vector3d &pt);
 }
 
 

@@ -1,7 +1,8 @@
 corresp:
   n_features: 200
-  distance_threshold_px: 3
+  distance_threshold_px: 1
   distances_ratio: 0.5
+  reprojection_error_px: 1
   debug_matches: true
   debug_epipolar: true
   debug_markers: true
@@ -9,3 +10,14 @@ corresp:
   debug_distances: true
   # triangulation method can be so-called primitive or svd
   triangulation_method: "svd"
+
+log_filenames:
+  debug_dump_to_files: true
+  #
+  absolute_path_prefix: "/home/mrs/git/uav_camera_localization/documents/"
+  distance: "3_5"
+  rms_reprojection_error: "_rms_repro_err.csv"
+  total_reprojection_error: "_total_repro_err.csv"
+  distance_camera_plane: "_plane_distance.csv"
+  distance_each_pt_to_plane: "_plane_pts_distance.csv"
+

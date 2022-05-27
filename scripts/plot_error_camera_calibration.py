@@ -34,14 +34,14 @@ if __name__ == "__main__":
     plt.title("Right camera reprojection error")
     plt.xlabel('image number')
     plt.ylabel('reprojection RMS error [px]')
-    plt.plot(x, data_reprojection_right[:l], color='g')
+    plt.scatter(x, data_reprojection_right[:l], color='g')
 
     plt.subplot(122)
 
     plt.title("Left camera reprojection error")
     plt.xlabel('image number')
     plt.ylabel('reprojection RMS error [px]')
-    plt.plot(x, data_reprojection_left[:l], color='g')
+    plt.scatter(x, data_reprojection_left[:l], color='g')
 
 
     fig.legend(loc="best")

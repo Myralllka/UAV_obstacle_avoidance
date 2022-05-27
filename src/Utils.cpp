@@ -6,6 +6,25 @@
 
 namespace camera_localization {
 
+    [[maybe_unused]] double dist_plane2pt(const Eigen::Vector4d &plane,
+                                          const Eigen::Vector3d &pt) {
+        return std::abs(plane.x() * pt.x() + plane.y() * pt.y() + plane.z() * pt.z() + plane.w()) /
+               std::sqrt(std::pow(plane.x(), 2) + std::pow(plane.y(), 2) + std::pow(plane.z(), 2));
+    }
+
+    [[maybe_unused]] double dist_plane2pt(const Eigen::Vector4d &plane,
+                                          const pcl::PointXYZ &pt) {
+        return std::abs(plane.x() * pt.x + plane.y() * pt.y + plane.z() * pt.z + plane.w()) /
+               std::sqrt(std::pow(plane.x(), 2) + std::pow(plane.y(), 2) + std::pow(plane.z(), 2));
+    }
+
+    [[maybe_unused]] Eigen::Vector3d closest_pt(const Eigen::Vector4d &plane,
+                                                const Eigen::Vector3d &pt) {
+        const auto d = dist_plane2pt(plane, pt);
+        const Eigen::Vector3d n{plane.x(), plane.y(), plane.z()};
+        return pt + (d / n.norm()) * n;
+    }
+
     [[maybe_unused]] Eigen::Matrix3d f2K33(const boost::array<double, 12> &P_in) {
         Eigen::Matrix3d K_out = Eigen::Matrix3d::Identity();
         K_out(0, 0) = P_in[0];
@@ -158,8 +177,8 @@ namespace camera_localization {
                                                const Eigen::Vector3d &X,
                                                const cv::Point2d &m1,
                                                const cv::Point2d &m2) {
-        return reprojection_error_half(P1, X, m1) +
-               reprojection_error_half(P2, X, m2);
+        return std::pow(reprojection_error_half(P1, X, m1), 2) +
+               std::pow(reprojection_error_half(P2, X, m2), 2);
     }
 
     [[maybe_unused]] std::pair<Eigen::Vector3d, Eigen::Vector3d>
@@ -185,7 +204,7 @@ namespace camera_localization {
         return std::make_pair(centroid, plane_normal);
     }
 
-    [[maybe_unused]] std::optional<Eigen::Vector4d>
+    [[maybe_unused]] std::optional<std::pair<Eigen::Vector4d, std::vector<int>>>
     best_plane_from_points_RANSAC(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr &cloud) {
         pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
@@ -195,8 +214,8 @@ namespace camera_localization {
         seg.setOptimizeCoefficients(true);
         // Mandatory
         seg.setModelType(pcl::SACMODEL_PLANE);
-        seg.setMethodType(pcl::SAC_RANSAC);
-        seg.setDistanceThreshold(0.01);
+        seg.setMethodType(pcl::SAC_MLESAC);
+        seg.setDistanceThreshold(0.02);
 
         seg.setInputCloud(cloud);
         seg.segment(*inliers, *coefficients);
@@ -206,14 +225,10 @@ namespace camera_localization {
             return {};
         }
 
-        std::cerr << "Model coefficients: " << coefficients->values[0] << " "
-                  << coefficients->values[1] << " "
-                  << coefficients->values[2] << " "
-                  << coefficients->values[3] << std::endl;
-
-        return Eigen::Vector4d{coefficients->values[0],
-                               coefficients->values[1],
-                               coefficients->values[2],
-                               coefficients->values[3]};
+        return std::pair{Eigen::Vector4d{coefficients->values[0],
+                                         coefficients->values[1],
+                                         coefficients->values[2],
+                                         coefficients->values[3]},
+                         inliers->indices};
     }
 }

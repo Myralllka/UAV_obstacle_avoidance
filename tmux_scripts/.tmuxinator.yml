@@ -36,6 +36,7 @@ windows:
 #      panes:
 #        - waitForRos; rosrun uav_camera_localization scripts/correspondences.py
   - uav_camera_localization:
-      layout: tiled
+      layout: main-vertical
       panes:
         - waitForRos; roslaunch uav_camera_localization uav_camera_localization.launch
+        - history -s "rostopic echo /rosout | grep '\\[CameraLocalization\\]'"

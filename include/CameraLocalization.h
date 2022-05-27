@@ -65,10 +65,14 @@ namespace camera_localization {
         bool m_debug_distances;
         bool m_debug_markers;
         bool m_debug_projection_error;
+        bool m_debug_log_files;
 
         /* ros parameters */
         std::string m_uav_name;
-
+        std::string m_fname_rms_repro;
+        std::string m_fname_total_repro;
+        std::string m_fname_dist_cam_plane;
+        std::string m_fname_dist_pts_to_plane;
         /* other parameters */
         std::string m_name_base;
         std::string m_name_CL;

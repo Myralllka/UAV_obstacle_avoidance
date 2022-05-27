@@ -43,6 +43,21 @@ namespace camera_localization {
         pl.loadParam("corresp/debug_markers", m_debug_markers);
         pl.loadParam("corresp/debug_projective_error", m_debug_projection_error);
 
+        // debug fnames
+        pl.loadParam("log_filenames/debug_dump_to_files", m_debug_log_files);
+        if (m_debug_log_files) {
+            std::string prefix, distance;
+            pl.loadParam("log_filenames/absolute_path_prefix", prefix);
+            pl.loadParam("log_filenames/distance", distance);
+            m_fname_rms_repro = prefix + distance +
+                                pl.loadParam2("log_filenames/rms_reprojection_error", std::string{});
+            m_fname_total_repro = prefix + distance +
+                                  pl.loadParam2("log_filenames/total_reprojection_error", std::string{});
+            m_fname_dist_cam_plane = prefix + distance +
+                                     pl.loadParam2("log_filenames/distance_camera_plane", std::string{});
+            m_fname_dist_pts_to_plane = prefix + distance +
+                                        pl.loadParam2("log_filenames/distance_each_pt_to_plane", std::string{});
+        }
         // image matching and filtering parameters
         int tmp_thr;
         pl.loadParam("corresp/distance_threshold_px", tmp_thr);
@@ -144,7 +159,7 @@ namespace camera_localization {
         if (m_fright_pose_opt.has_value()) {
             m_fright_pose = tf2::transformToEigen(m_fright_pose_opt.value());
         } else {
-            ROS_ERROR_ONCE("[%s]: fuck. No right camera position found.\n", NODENAME.c_str());
+            ROS_ERROR_ONCE("[%s]: No right camera position found.\n", NODENAME.c_str());
             ros::shutdown();
         }
 
@@ -152,7 +167,7 @@ namespace camera_localization {
         if (m_fleft_pose_opt.has_value()) {
             m_fleft_pose = tf2::transformToEigen(m_fleft_pose_opt.value());
         } else {
-            ROS_ERROR_ONCE("[%s]: fuck. No left camera position found.\n", NODENAME.c_str());
+            ROS_ERROR_ONCE("[%s]: No left camera position found.\n", NODENAME.c_str());
             ros::shutdown();
         }
 
@@ -205,13 +220,35 @@ namespace camera_localization {
 
         if (pts->size() < 4) {
             ROS_ERROR_THROTTLE(1.0, "[%s]: point cloud callback: not enough pts detected!", NODENAME.c_str());
+            if (m_debug_log_files) {
+                std::ofstream f_pts, f_dist;
+                f_pts.open(m_fname_dist_pts_to_plane, std::ios_base::app);
+                f_dist.open(m_fname_dist_cam_plane, std::ios_base::app);
+                f_dist << "0, \n";
+                f_pts << "0, \n";
+            }
             return;
         }
 
         auto plane_opt = best_plane_from_points_RANSAC(pts);
         if (plane_opt.has_value()) {
-            Eigen::Vector4d plane = plane_opt.value();
+            Eigen::Vector4d plane = std::get<0>(plane_opt.value());
+            std::vector<int> inliers = std::get<1>(plane_opt.value());
             m_pub_markplane.publish(create_marker_plane(plane, m_name_base, cv::Scalar(0, 100, 0)));
+            ROS_INFO("[%s]: DISTANCE TO THE ESTIMATED PLANE = %.4f",
+                     NODENAME.c_str(),
+                     dist_plane2pt(plane, {0, 0, 0}));
+            if (m_debug_log_files) {
+                std::ofstream f_pts, f_dist;
+                f_pts.open(m_fname_dist_pts_to_plane, std::ios_base::app);
+                f_dist.open(m_fname_dist_cam_plane, std::ios_base::app);
+                f_dist << dist_plane2pt(plane, {0, 0, 0}) << ", \n";
+                for (const auto &i: inliers) {
+                    const auto dist = dist_plane2pt(plane, pts->points[i]);
+                    f_pts << dist << ", ";
+                }
+                f_pts << ", \n";
+            }
         } else {
             ROS_ERROR_THROTTLE(1.0, "[%s]: point cloud callback: no plane detected!", NODENAME.c_str());
             return;
@@ -298,6 +335,30 @@ namespace camera_localization {
                 colors.push_back(color);
             }
 
+            double res_total_reprojection_error = 0;
+            double res_total_reprojection_error_RMS = 0;
+
+            for (size_t i = 0; i < res_pts_3d.size(); ++i) {
+                const auto reproj_current = reprojection_error(m_P_L_eig, m_P_R_eig,
+                                                               res_pts_3d[i],
+                                                               kpts_filtered_1[i],
+                                                               kpts_filtered_2[i]);
+                res_total_reprojection_error += reproj_current;
+                res_total_reprojection_error_RMS += std::pow(reproj_current, 2);
+            }
+
+            ROS_INFO("[%s]: total_repr_err = %.4f;\t RMS_repr %.4f",
+                     NODENAME.c_str(),
+                     res_total_reprojection_error,
+                     std::sqrt(res_total_reprojection_error_RMS / res_pts_3d.size()));
+            if (m_debug_log_files) {
+                std::ofstream f_rms, f_total;
+                f_rms.open(m_fname_rms_repro, std::ios_base::app);
+                f_total.open(m_fname_total_repro, std::ios_base::app);
+
+                f_rms << res_total_reprojection_error_RMS << ",\n";
+                f_total << res_total_reprojection_error << ",\n";
+            }
             if (m_debug_markers) {
                 for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
                     const auto cv_ray1 = m_camera_left.projectPixelTo3dRay(kpts_filtered_1[i]);
@@ -311,7 +372,6 @@ namespace camera_localization {
                 }
             }
             if (m_debug_projection_error or m_debug_distances) {
-                double res_total_reprojection_error = 0;
                 cv::Mat imright, imleft;
                 cv_image_right.copyTo(imright);
                 cv_image_left.copyTo(imleft);
@@ -324,10 +384,6 @@ namespace camera_localization {
                         cv::circle(imright, u_right, 1, colors[i], 2);
                         cv::line(imleft, u_left, kpts_filtered_1[i], colors[i], 2);
                         cv::line(imright, u_right, kpts_filtered_2[i], colors[i], 2);
-                        res_total_reprojection_error += reprojection_error(m_P_L_eig, m_P_R_eig,
-                                                                           res_pts_3d[i],
-                                                                           kpts_filtered_1[i],
-                                                                           kpts_filtered_2[i]);
                     }
                 }
                 if (m_debug_distances) {
@@ -354,20 +410,15 @@ namespace camera_localization {
                 }
                 m_pub_im_left_debug.publish(cv_bridge::CvImage(std_msgs::Header(), "bgr8", imleft).toImageMsg());
                 m_pub_im_right_debug.publish(cv_bridge::CvImage(std_msgs::Header(), "bgr8", imright).toImageMsg());
-                ROS_INFO("[%s]: TOTAL_REPROJECTION_ERROR = %.2f;\n\t\t\t\t reprojection averaged = %.2f",
-                         NODENAME.c_str(),
-                         res_total_reprojection_error,
-                         res_total_reprojection_error / kpts_filtered_1.size());
             }
 
             m_pub_markarray.publish(markerarr);
-//            res_pts_3d.emplace_back(m_o1_3d.x, m_o1_3d.y, m_o1_3d.z);
-//            res_pts_3d.emplace_back(m_o2_3d.x, m_o2_3d.y, m_o2_3d.z);
             auto pc = pts_to_cloud(res_pts_3d);
             m_pub_pcld.publish(pc);
-//        } else {
+        } else {
             ROS_WARN_THROTTLE(2.0, "[%s]: No new images to search for correspondences", NODENAME.c_str());
         }
+        ros::Duration{0.5}.sleep();
     }
 
 
@@ -522,7 +573,6 @@ namespace camera_localization {
             D.row(3) = P2.row(2) * u2[i].y - P2.row(1);
             Eigen::JacobiSVD<Eigen::Matrix<double, 4, 4>, Eigen::ComputeThinU | Eigen::ComputeThinV> svd(D);
             auto X = svd.matrixU().transpose().bottomRows<1>();
-//            std::cout << X << std::endl;
             res.emplace_back(X.x() / X.w(), X.y() / X.w(), X.z() / X.w());
         }
         return res;
