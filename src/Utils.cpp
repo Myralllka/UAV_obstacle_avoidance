@@ -151,9 +151,9 @@ namespace camera_localization {
             j = -sss;
             while (j <= sss) {
                 geometry_msgs::Point p;
-                p.x = i;
+                p.x = (-d - (i * b) - (c * j)) / a;
                 p.y = j;
-                p.z = (-d - (i * a) - (b * j)) / c;
+                p.z = i;
                 j += 0.05;
                 m1.points.push_back(p);
             }
