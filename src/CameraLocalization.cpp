@@ -441,7 +441,7 @@ namespace camera_localization {
         } else {
             ROS_WARN_THROTTLE(2.0, "[%s]: No new images to search for correspondences", NODENAME.c_str());
         }
-        ros::Duration{0.5}.sleep();
+//        ros::Duration{0.5}.sleep();
     }
 
 
