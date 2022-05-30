@@ -94,6 +94,7 @@ namespace camera_localization {
         float m_distance_ratio;
         size_t m_distance_threshold;
         // TODO: generalize
+        cv::Rect rect_l, rect_r;
         cv::Mat m_mask_left{cv::Mat::zeros(cv::Size{1600, 1200}, CV_8U)};
         cv::Mat m_mask_right{cv::Mat::zeros(cv::Size{1600, 1200}, CV_8U)};
 

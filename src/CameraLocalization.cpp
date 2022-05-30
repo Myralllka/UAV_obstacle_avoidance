@@ -33,8 +33,10 @@ namespace camera_localization {
         pl.loadParam("cam_fright_roi/x_y_w_h", rroi);
 
         // initiate masks for an image matching part
-        m_mask_left(cv::Rect{lroi[0], lroi[1], lroi[2], lroi[3]}) = cv::Scalar{255};
-        m_mask_right(cv::Rect{rroi[0], rroi[1], rroi[2], rroi[3]}) = cv::Scalar{255};
+        rect_l = cv::Rect{lroi[0], lroi[1], lroi[2], lroi[3]};
+        rect_r = cv::Rect{rroi[0], rroi[1], rroi[2], rroi[3]};
+        m_mask_left(rect_l) = cv::Scalar{255};
+        m_mask_right(rect_r) = cv::Scalar{255};
 
         // booleans for debug control
         pl.loadParam("corresp/debug_epipolar", m_debug_epipolar);
@@ -51,10 +53,10 @@ namespace camera_localization {
             pl.loadParam("log_filenames/distance", m_plane_dist);
             pl.loadParam("log_filenames/generate_plane", m_generate_artificial_plane);
 
-            m_fname_rms_repro = prefix + std::to_string(m_plane_dist) +
-                                pl.loadParam2("log_filenames/rms_reprojection_error", std::string{});
-            m_fname_total_repro = prefix + std::to_string(m_plane_dist) +
-                                  pl.loadParam2("log_filenames/total_reprojection_error", std::string{});
+//            m_fname_rms_repro = prefix + std::to_string(m_plane_dist) +
+//                                pl.loadParam2("log_filenames/rms_reprojection_error", std::string{});
+//            m_fname_total_repro = prefix + std::to_string(m_plane_dist) +
+//                                  pl.loadParam2("log_filenames/total_reprojection_error", std::string{});
             m_fname_dist_cam_plane = prefix + std::to_string(m_plane_dist) +
                                      pl.loadParam2("log_filenames/distance_camera_plane", std::string{});
             m_fname_dist_pts_to_plane = prefix + std::to_string(m_plane_dist) +
@@ -226,8 +228,8 @@ namespace camera_localization {
                 std::ofstream f_pts, f_dist;
                 f_pts.open(m_fname_dist_pts_to_plane, std::ios_base::app);
                 f_dist.open(m_fname_dist_cam_plane, std::ios_base::app);
-                f_dist << "0, \n";
-                f_pts << "0, \n";
+//                f_dist << "0, \n";
+//                f_pts << "0, \n";
             }
             return;
         }
@@ -244,12 +246,15 @@ namespace camera_localization {
                 std::ofstream f_pts, f_dist;
                 f_pts.open(m_fname_dist_pts_to_plane, std::ios_base::app);
                 f_dist.open(m_fname_dist_cam_plane, std::ios_base::app);
-                f_dist << dist_plane2pt(plane, {0, 0, 0}) << ", \n";
+                double total_dist = 0;
                 for (const auto &point: pts->points) {
                     const auto dist = dist_plane2pt(plane, point);
+                    total_dist += dist;
                     f_pts << dist << ", ";
                 }
                 f_pts << ", \n";
+                std::cout << total_dist / pts->points.size() << std::endl;
+                f_dist << total_dist / pts->points.size() << std::endl;
             }
         } else {
             auto plane_opt = best_plane_from_points_RANSAC(pts);
@@ -260,17 +265,17 @@ namespace camera_localization {
                 ROS_INFO("[%s]: DISTANCE TO THE ESTIMATED PLANE = %.4f",
                          NODENAME.c_str(),
                          dist_plane2pt(plane, {0, 0, 0}));
-                if (m_debug_log_files) {
-                    std::ofstream f_pts, f_dist;
-                    f_pts.open(m_fname_dist_pts_to_plane, std::ios_base::app);
-                    f_dist.open(m_fname_dist_cam_plane, std::ios_base::app);
-                    f_dist << dist_plane2pt(plane, {0, 0, 0}) << ", \n";
-                    for (const auto &i: inliers) {
-                        const auto dist = dist_plane2pt(plane, pts->points[i]);
-                        f_pts << dist << ", ";
-                    }
-                    f_pts << ", \n";
-                }
+//                if (m_debug_log_files) {
+//                    std::ofstream f_pts, f_dist;
+//                    f_pts.open(m_fname_dist_pts_to_plane, std::ios_base::app);
+//                    f_dist.open(m_fname_dist_cam_plane, std::ios_base::app);
+//                    f_dist << dist_plane2pt(plane, {0, 0, 0}) << ", \n";
+//                    for (const auto &i: inliers) {
+//                        const auto dist = dist_plane2pt(plane, pts->points[i]);
+//                        f_pts << dist << ", ";
+//                    }
+//                    f_pts << ", \n";
+//                }
             } else {
                 ROS_ERROR_THROTTLE(1.0, "[%s]: point cloud callback: no plane detected!", NODENAME.c_str());
                 return;
@@ -358,30 +363,30 @@ namespace camera_localization {
                 colors.push_back(color);
             }
 
-            double res_total_reprojection_error = 0;
-            double res_total_reprojection_error_RMS = 0;
-
-            for (size_t i = 0; i < res_pts_3d.size(); ++i) {
-                const auto reproj_current = reprojection_error(m_P_L_eig, m_P_R_eig,
-                                                               res_pts_3d[i],
-                                                               kpts_filtered_1[i],
-                                                               kpts_filtered_2[i]);
-                res_total_reprojection_error += reproj_current;
-                res_total_reprojection_error_RMS += std::pow(reproj_current, 2);
-            }
-
-            ROS_INFO("[%s]: total_repr_err = %.4f;\t RMS_repr %.4f",
-                     NODENAME.c_str(),
-                     res_total_reprojection_error,
-                     std::sqrt(res_total_reprojection_error_RMS / res_pts_3d.size()));
-            if (m_debug_log_files) {
-                std::ofstream f_rms, f_total;
-                f_rms.open(m_fname_rms_repro, std::ios_base::app);
-                f_total.open(m_fname_total_repro, std::ios_base::app);
-
-                f_rms << res_total_reprojection_error_RMS << ",\n";
-                f_total << res_total_reprojection_error << ",\n";
-            }
+//            double res_total_reprojection_error = 0;
+//            double res_total_reprojection_error_RMS = 0;
+//
+//            for (size_t i = 0; i < res_pts_3d.size(); ++i) {
+//                const auto reproj_current = reprojection_error(m_P_L_eig, m_P_R_eig,
+//                                                               res_pts_3d[i],
+//                                                               kpts_filtered_1[i],
+//                                                               kpts_filtered_2[i]);
+//                res_total_reprojection_error += reproj_current;
+//                res_total_reprojection_error_RMS += std::pow(reproj_current, 2);
+//            }
+//
+//            ROS_INFO("[%s]: total_repr_err = %.4f;\t RMS_repr %.4f",
+//                     NODENAME.c_str(),
+//                     res_total_reprojection_error,
+//                     std::sqrt(res_total_reprojection_error_RMS / res_pts_3d.size()));
+//            if (m_debug_log_files) {
+//                std::ofstream f_rms, f_total;
+//                f_rms.open(m_fname_rms_repro, std::ios_base::app);
+//                f_total.open(m_fname_total_repro, std::ios_base::app);
+//
+//                f_rms << res_total_reprojection_error_RMS << ",\n";
+//                f_total << res_total_reprojection_error << ",\n";
+//            }
             if (m_debug_markers) {
                 for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
                     const auto cv_ray1 = m_camera_left.projectPixelTo3dRay(kpts_filtered_1[i]);
@@ -398,6 +403,8 @@ namespace camera_localization {
                 cv::Mat imright, imleft;
                 cv_image_right.copyTo(imright);
                 cv_image_left.copyTo(imleft);
+                cv::rectangle(imleft, rect_l, cv::Scalar{0, 100, 0}, 2);
+                cv::rectangle(imright, rect_r, cv::Scalar{0, 100, 0}, 2);
                 if (m_debug_projection_error) {
                     for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
                         const auto u_left = PX2u(m_P_L_eig, res_pts_3d[i]);
@@ -441,7 +448,7 @@ namespace camera_localization {
         } else {
             ROS_WARN_THROTTLE(2.0, "[%s]: No new images to search for correspondences", NODENAME.c_str());
         }
-//        ros::Duration{0.5}.sleep();
+        ros::Duration{0.5}.sleep();
     }
 
 

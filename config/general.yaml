@@ -15,11 +15,11 @@ log_filenames:
   debug_dump_to_files: true
   #
   absolute_path_prefix: "/home/mrs/git/uav_camera_localization/documents/"
-  distance: 8
+  distance: 6.6
   # if true - plane will be generated from distance (parallel to yz plane), otherwise it will be estimated
   generate_plane: true
-  rms_reprojection_error: "_rms_repro_err.csv"
-  total_reprojection_error: "_total_repro_err.csv"
+#  rms_reprojection_error: "_rms_repro_err.csv"
+#  total_reprojection_error: "_total_repro_err.csv"
   distance_camera_plane: "_plane_distance.csv"
   distance_each_pt_to_plane: "_plane_pts_distance.csv"
 
