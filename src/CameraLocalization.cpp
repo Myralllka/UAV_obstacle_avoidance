@@ -53,10 +53,10 @@ namespace camera_localization {
             pl.loadParam("log_filenames/distance", m_plane_dist);
             pl.loadParam("log_filenames/generate_plane", m_generate_artificial_plane);
 
-//            m_fname_rms_repro = prefix + std::to_string(m_plane_dist) +
-//                                pl.loadParam2("log_filenames/rms_reprojection_error", std::string{});
-//            m_fname_total_repro = prefix + std::to_string(m_plane_dist) +
-//                                  pl.loadParam2("log_filenames/total_reprojection_error", std::string{});
+            m_fname_rms_repro = prefix + std::to_string(m_plane_dist) +
+                                pl.loadParam2("log_filenames/rms_reprojection_error", std::string{});
+            m_fname_total_repro = prefix + std::to_string(m_plane_dist) +
+                                  pl.loadParam2("log_filenames/total_reprojection_error", std::string{});
             m_fname_dist_cam_plane = prefix + std::to_string(m_plane_dist) +
                                      pl.loadParam2("log_filenames/distance_camera_plane", std::string{});
             m_fname_dist_pts_to_plane = prefix + std::to_string(m_plane_dist) +
@@ -228,8 +228,8 @@ namespace camera_localization {
                 std::ofstream f_pts, f_dist;
                 f_pts.open(m_fname_dist_pts_to_plane, std::ios_base::app);
                 f_dist.open(m_fname_dist_cam_plane, std::ios_base::app);
-//                f_dist << "0, \n";
-//                f_pts << "0, \n";
+                f_dist << "0, \n";
+                f_pts << "0, \n";
             }
             return;
         }
@@ -265,17 +265,17 @@ namespace camera_localization {
                 ROS_INFO("[%s]: DISTANCE TO THE ESTIMATED PLANE = %.4f",
                          NODENAME.c_str(),
                          dist_plane2pt(plane, {0, 0, 0}));
-//                if (m_debug_log_files) {
-//                    std::ofstream f_pts, f_dist;
-//                    f_pts.open(m_fname_dist_pts_to_plane, std::ios_base::app);
-//                    f_dist.open(m_fname_dist_cam_plane, std::ios_base::app);
-//                    f_dist << dist_plane2pt(plane, {0, 0, 0}) << ", \n";
-//                    for (const auto &i: inliers) {
-//                        const auto dist = dist_plane2pt(plane, pts->points[i]);
-//                        f_pts << dist << ", ";
-//                    }
-//                    f_pts << ", \n";
-//                }
+                if (m_debug_log_files) {
+                    std::ofstream f_pts, f_dist;
+                    f_pts.open(m_fname_dist_pts_to_plane, std::ios_base::app);
+                    f_dist.open(m_fname_dist_cam_plane, std::ios_base::app);
+                    f_dist << dist_plane2pt(plane, {0, 0, 0}) << ", \n";
+                    for (const auto &i: inliers) {
+                        const auto dist = dist_plane2pt(plane, pts->points[i]);
+                        f_pts << dist << ", ";
+                    }
+                    f_pts << ", \n";
+                }
             } else {
                 ROS_ERROR_THROTTLE(1.0, "[%s]: point cloud callback: no plane detected!", NODENAME.c_str());
                 return;
@@ -363,30 +363,30 @@ namespace camera_localization {
                 colors.push_back(color);
             }
 
-//            double res_total_reprojection_error = 0;
-//            double res_total_reprojection_error_RMS = 0;
-//
-//            for (size_t i = 0; i < res_pts_3d.size(); ++i) {
-//                const auto reproj_current = reprojection_error(m_P_L_eig, m_P_R_eig,
-//                                                               res_pts_3d[i],
-//                                                               kpts_filtered_1[i],
-//                                                               kpts_filtered_2[i]);
-//                res_total_reprojection_error += reproj_current;
-//                res_total_reprojection_error_RMS += std::pow(reproj_current, 2);
-//            }
-//
-//            ROS_INFO("[%s]: total_repr_err = %.4f;\t RMS_repr %.4f",
-//                     NODENAME.c_str(),
-//                     res_total_reprojection_error,
-//                     std::sqrt(res_total_reprojection_error_RMS / res_pts_3d.size()));
-//            if (m_debug_log_files) {
-//                std::ofstream f_rms, f_total;
-//                f_rms.open(m_fname_rms_repro, std::ios_base::app);
-//                f_total.open(m_fname_total_repro, std::ios_base::app);
-//
-//                f_rms << res_total_reprojection_error_RMS << ",\n";
-//                f_total << res_total_reprojection_error << ",\n";
-//            }
+            double res_total_reprojection_error = 0;
+            double res_total_reprojection_error_RMS = 0;
+
+            for (size_t i = 0; i < res_pts_3d.size(); ++i) {
+                const auto reproj_current = reprojection_error(m_P_L_eig, m_P_R_eig,
+                                                               res_pts_3d[i],
+                                                               kpts_filtered_1[i],
+                                                               kpts_filtered_2[i]);
+                res_total_reprojection_error += reproj_current;
+                res_total_reprojection_error_RMS += std::pow(reproj_current, 2);
+            }
+
+            ROS_INFO("[%s]: total_repr_err = %.4f;\t RMS_repr %.4f",
+                     NODENAME.c_str(),
+                     res_total_reprojection_error,
+                     std::sqrt(res_total_reprojection_error_RMS / res_pts_3d.size()));
+            if (m_debug_log_files) {
+                std::ofstream f_rms, f_total;
+                f_rms.open(m_fname_rms_repro, std::ios_base::app);
+                f_total.open(m_fname_total_repro, std::ios_base::app);
+
+                f_rms << res_total_reprojection_error_RMS << ",\n";
+                f_total << res_total_reprojection_error << ",\n";
+            }
             if (m_debug_markers) {
                 for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
                     const auto cv_ray1 = m_camera_left.projectPixelTo3dRay(kpts_filtered_1[i]);
