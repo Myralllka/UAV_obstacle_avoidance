@@ -61,6 +61,8 @@ namespace camera_localization {
                                      pl.loadParam2("log_filenames/distance_camera_plane", std::string{});
             m_fname_dist_pts_to_plane = prefix + std::to_string(m_plane_dist) +
                                         pl.loadParam2("log_filenames/distance_each_pt_to_plane", std::string{});
+            m_fname_disp_mean = prefix + std::to_string(m_plane_dist) +
+                                pl.loadParam2("log_filenames/disparity_mean", std::string{});
         }
         // image matching and filtering parameters
         int tmp_thr;
@@ -228,8 +230,8 @@ namespace camera_localization {
                 std::ofstream f_pts, f_dist;
                 f_pts.open(m_fname_dist_pts_to_plane, std::ios_base::app);
                 f_dist.open(m_fname_dist_cam_plane, std::ios_base::app);
-                f_dist << "0, \n";
-                f_pts << "0, \n";
+                f_dist << "0 \n";
+                f_pts << "0 \n";
             }
             return;
         }
@@ -374,18 +376,29 @@ namespace camera_localization {
                 res_total_reprojection_error += reproj_current;
                 res_total_reprojection_error_RMS += std::pow(reproj_current, 2);
             }
+            double total_disparity = 0;
+            for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
+                auto curr = norm((kpts_filtered_1[i] - kpts_filtered_2[i]));
+                total_disparity += curr;
+            }
+
+            ROS_INFO("[%s]: mean_disparuity = %.4f",
+                     NODENAME.c_str(),
+                     total_disparity / kpts_filtered_1.size());
 
             ROS_INFO("[%s]: total_repr_err = %.4f;\t RMS_repr %.4f",
                      NODENAME.c_str(),
                      res_total_reprojection_error,
                      std::sqrt(res_total_reprojection_error_RMS / res_pts_3d.size()));
             if (m_debug_log_files) {
-                std::ofstream f_rms, f_total;
+                std::ofstream f_rms, f_total, f_mdisp;
                 f_rms.open(m_fname_rms_repro, std::ios_base::app);
                 f_total.open(m_fname_total_repro, std::ios_base::app);
+                f_mdisp.open(m_fname_disp_mean, std::ios_base::app);
 
-                f_rms << res_total_reprojection_error_RMS << ",\n";
-                f_total << res_total_reprojection_error << ",\n";
+                f_rms << res_total_reprojection_error_RMS << "\n";
+                f_total << res_total_reprojection_error << "\n";
+                f_mdisp << total_disparity / kpts_filtered_1.size() << " \n";
             }
             if (m_debug_markers) {
                 for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
@@ -396,7 +409,7 @@ namespace camera_localization {
 
                     markerarr->markers.emplace_back(create_marker_ray(eigen_vec1, O, m_name_CL, counter++, colors[i]));
                     markerarr->markers.emplace_back(create_marker_ray(eigen_vec2, O, m_name_CR, counter++, colors[i]));
-                    markerarr->markers.push_back(create_marker_pt(res_pts_3d[i], counter++, colors[i]));
+                    markerarr->markers.push_back(create_marker_pt(m_name_base, res_pts_3d[i], counter++, colors[i]));
                 }
             }
             if (m_debug_projection_error or m_debug_distances) {
@@ -443,12 +456,12 @@ namespace camera_localization {
             }
 
             m_pub_markarray.publish(markerarr);
-            auto pc = pts_to_cloud(res_pts_3d);
+            auto pc = pts_to_cloud(res_pts_3d, m_name_base);
             m_pub_pcld.publish(pc);
         } else {
             ROS_WARN_THROTTLE(2.0, "[%s]: No new images to search for correspondences", NODENAME.c_str());
         }
-        ros::Duration{0.5}.sleep();
+//        ros::Duration{0.5}.sleep();
     }
 
 
@@ -468,7 +481,8 @@ namespace camera_localization {
             auto ray_opt = m_transformer.transformSingle(m_name_CL, eigen_vec1, m_name_base, ros::Time(0));
             auto ray2_opt = m_transformer.transformSingle(m_name_CR, eigen_vec2, m_name_base, ros::Time(0));
             if (ray_opt.has_value() and ray2_opt.has_value()) {
-                auto pt = estimate_point_between_rays({m_o1_3d.x, m_o1_3d.y, m_o1_3d.z},
+                auto pt = estimate_point_between_rays(NODENAME,
+                                                      {m_o1_3d.x, m_o1_3d.y, m_o1_3d.z},
                                                       {m_o2_3d.x, m_o2_3d.y, m_o2_3d.z},
                                                       ray_opt.value(),
                                                       ray2_opt.value());
@@ -539,159 +553,6 @@ namespace camera_localization {
             res_matches.push_back(matche);
         }
     }
-
-    Eigen::Vector3d CameraLocalization::estimate_point_between_rays(const Eigen::Vector3d &o1,
-                                                                    const Eigen::Vector3d &o2,
-                                                                    const Eigen::Vector3d &r1,
-                                                                    const Eigen::Vector3d &r2) {
-        const Eigen::Vector3d m = o2 - o1;
-        const Eigen::Vector3d d1 = r1.normalized();
-        const Eigen::Vector3d d2 = r2.normalized();
-
-        const double s = std::abs((d2.dot(m) - d1.dot(m) * d1.dot(d2)) / (1.0 - d1.dot(d2) * d1.dot(d2)));
-        const double t = std::abs((d1.dot(m) + s * d1.dot(d2)));
-
-        const Eigen::Vector3d p1 = o1 + t * d1;
-        const Eigen::Vector3d p2 = o2 + s * d2;
-
-        Eigen::Vector3d res = (p1 + p2) / 2;
-        res = p2;
-
-        ROS_INFO_THROTTLE(2.0, "[%s]: closest distance of rays: %.2fm",
-                          NODENAME.c_str(),
-                          (p2 - p1).norm());
-        ROS_INFO_THROTTLE(2.0, "[%s]: distance to the object: %.2fm",
-                          NODENAME.c_str(),
-                          res.norm());
-        return res;
-    }
-
-    visualization_msgs::Marker
-    CameraLocalization::create_marker_pt(const Eigen::Vector3d &pt,
-                                         const int id,
-                                         const cv::Scalar &color) {
-        visualization_msgs::Marker m1;
-        m1.header.frame_id = m_name_base;
-        m1.header.stamp = ros::Time::now();
-        m1.ns = "points";
-        m1.id = id;
-        m1.lifetime = ros::Duration(1.0);
-        m1.color.a = 1;
-        m1.color.r = color[0] / 255.0;
-        m1.color.g = color[1] / 255.0;
-        m1.color.b = color[2] / 255.0;
-        m1.pose.position.x = pt.x();
-        m1.pose.position.y = pt.y();
-        m1.pose.position.z = pt.z();
-        m1.type = visualization_msgs::Marker::SPHERE;
-        m1.scale.x = 0.1;
-        m1.scale.y = 0.1;
-        m1.scale.z = 0.1;
-        return m1;
-    }
-
-    std::vector<Eigen::Vector3d> CameraLocalization::triangulate_tdv(const Eigen::Matrix<double, 3, 4> &P1,
-                                                                     const Eigen::Matrix<double, 3, 4> &P2,
-                                                                     const std::vector<cv::Point2d> &u1,
-                                                                     const std::vector<cv::Point2d> &u2) {
-        std::vector<Eigen::Vector3d> res;
-        Eigen::Matrix<double, 4, 4> D;
-        for (size_t i = 0; i < u1.size(); ++i) {
-            D.row(0) = P1.row(2) * u1[i].x - P1.row(0);
-            D.row(1) = P1.row(2) * u1[i].y - P1.row(1);
-            D.row(2) = P2.row(2) * u2[i].x - P2.row(0);
-            D.row(3) = P2.row(2) * u2[i].y - P2.row(1);
-            Eigen::JacobiSVD<Eigen::Matrix<double, 4, 4>, Eigen::ComputeThinU | Eigen::ComputeThinV> svd(D);
-            auto X = svd.matrixU().transpose().bottomRows<1>();
-            res.emplace_back(X.x() / X.w(), X.y() / X.w(), X.z() / X.w());
-        }
-        return res;
-    }
-
-    //convert point cloud image to ros message
-    sensor_msgs::PointCloud2 CameraLocalization::pts_to_cloud(const std::vector<Eigen::Vector3d> &pts) {
-        //rgb is a cv::Mat with 3 color channels of size 640x480
-        //coords is a cv::Mat with xyz channels of size 640x480, units in mm from calibration
-
-        //figure out number of points
-        size_t numpoints = pts.size();
-
-        //declare message and sizes
-        sensor_msgs::PointCloud2 cloud;
-        cloud.header.frame_id = m_name_base;
-        cloud.header.stamp = ros::Time::now();
-        cloud.width = numpoints;
-        cloud.height = 1;
-        cloud.is_bigendian = false;
-        cloud.is_dense = false; // there may be invalid points
-
-        //for fields setup
-        sensor_msgs::PointCloud2Modifier modifier(cloud);
-        modifier.setPointCloud2FieldsByString(2, "xyz", "rgb");
-        modifier.resize(numpoints);
-
-        //iterators
-        sensor_msgs::PointCloud2Iterator<float> out_x(cloud, "x");
-        sensor_msgs::PointCloud2Iterator<float> out_y(cloud, "y");
-        sensor_msgs::PointCloud2Iterator<float> out_z(cloud, "z");
-        sensor_msgs::PointCloud2Iterator<uint8_t> out_r(cloud, "r");
-        sensor_msgs::PointCloud2Iterator<uint8_t> out_g(cloud, "g");
-        sensor_msgs::PointCloud2Iterator<uint8_t> out_b(cloud, "b");
-
-        for (size_t i = 0; i < pts.size(); ++i, ++out_x, ++out_y, ++out_z, ++out_r, ++out_g, ++out_b) {
-            //get the image coordinate for this point and convert to mm
-            auto pointcoord = pts[i];
-            const float X_World = pointcoord.x();
-            const float Y_World = pointcoord.y();
-            const float Z_World = pointcoord.z();
-            //store xyz in point cloud, transforming from image coordinates, (Z Forward to X Forward)
-            *out_x = X_World;
-            *out_y = Y_World;
-            *out_z = Z_World;
-            *out_r = 66;
-            *out_g = 66;
-            *out_b = 66;
-        }
-        return cloud;
-    }
-
-    [[maybe_unused]] cv::Scalar CameraLocalization::generate_random_color() {
-        std::random_device rd;
-        std::mt19937 generator(rd());
-        std::uniform_int_distribution<uint8_t> distribution{0, 255};
-
-        uint8_t r = distribution(generator);
-        uint8_t g = distribution(generator);
-        uint8_t b = distribution(generator);
-        return cv::Scalar(b, g, r);
-    }
-
-    [[maybe_unused]] void CameraLocalization::draw_epipolar_line(cv::Mat &img,
-                                                                 std::vector<cv::Point3f> &line,
-                                                                 const std::vector<cv::Point2f> &pts) {
-        // source https://docs.opencv.org/3.4/da/de9/tutorial_py_epipolar_geometry.html
-        auto w = img.size[1]; // c
-        for (size_t i = 0; i < line.size(); ++i) {
-            // randomly generate line color
-            auto color = generate_random_color();
-            auto x0 = .0f;
-            auto x1 = static_cast<double>(w);
-
-            double l0 = line[i].x;
-            double l1 = line[i].y;
-            double l2 = line[i].z;
-
-            double y0 = -l2 / l1;
-            double y1 = -(l2 + l0 * w) / l1;
-
-            auto p1 = cv::Point{static_cast<int>(std::round(x0)), static_cast<int>(std::ceil(y0))};
-            auto p2 = cv::Point{static_cast<int>(std::round(x1)), static_cast<int>(std::ceil(y1))};
-
-            cv::line(img, p1, p2, color, 3);
-            cv::circle(img, pts[i], 2, color, 5);
-        }
-    }
-
 }  // namespace camera_localization
 
 /* every nodelet must export its class as nodelet plugin */

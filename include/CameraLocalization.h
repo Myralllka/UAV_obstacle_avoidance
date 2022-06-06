@@ -26,9 +26,6 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <image_geometry/pinhole_camera_model.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/PointField.h>
-#include <sensor_msgs/point_cloud2_iterator.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <pcl/point_types.h>
@@ -74,6 +71,8 @@ namespace camera_localization {
         std::string m_fname_total_repro;
         std::string m_fname_dist_cam_plane;
         std::string m_fname_dist_pts_to_plane;
+        std::string m_fname_disp;
+        std::string m_fname_disp_mean;
         double m_plane_dist;
 
         /* other parameters */
@@ -156,27 +155,8 @@ namespace camera_localization {
                                              std::vector<cv::Point2d> &res_kpts1,
                                              std::vector<cv::Point2d> &res_kpts2);
 
-        [[maybe_unused]] static std::vector<Eigen::Vector3d> triangulate_tdv(const Eigen::Matrix<double, 3, 4> &P1,
-                                                                             const Eigen::Matrix<double, 3, 4> &P2,
-                                                                             const std::vector<cv::Point2d> &u1,
-                                                                             const std::vector<cv::Point2d> &u2);
 
-        [[maybe_unused]] sensor_msgs::PointCloud2 pts_to_cloud(const std::vector<Eigen::Vector3d> &pts);
 
-        [[maybe_unused]] Eigen::Vector3d estimate_point_between_rays(const Eigen::Vector3d &o1,
-                                                                     const Eigen::Vector3d &o2,
-                                                                     const Eigen::Vector3d &r1,
-                                                                     const Eigen::Vector3d &r2);
-
-        [[maybe_unused]] visualization_msgs::Marker create_marker_pt(const Eigen::Vector3d &pt,
-                                                                     const int id,
-                                                                     const cv::Scalar &color);
-
-        [[maybe_unused]] void draw_epipolar_line(cv::Mat &img,
-                                                 std::vector<cv::Point3f> &line,
-                                                 const std::vector<cv::Point2f> &pts);
-
-        [[maybe_unused]] static cv::Scalar generate_random_color();
     };
 //}
 

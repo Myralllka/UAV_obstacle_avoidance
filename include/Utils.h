@@ -22,6 +22,11 @@
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/geometry/conversions.h>
 
+// point cloud
+#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/PointField.h>
+#include <sensor_msgs/point_cloud2_iterator.h>
+
 // Opencv
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -104,6 +109,33 @@ namespace camera_localization {
 
     [[maybe_unused]] Eigen::Vector3d closest_pt(const Eigen::Vector4d &plane,
                                                 const Eigen::Vector3d &pt);
+
+    [[maybe_unused]] sensor_msgs::PointCloud2 pts_to_cloud(const std::vector<Eigen::Vector3d> &pts,
+                                                           const std::string &base);
+
+    [[maybe_unused]] visualization_msgs::Marker
+    create_marker_pt(const std::string &base,
+                     const Eigen::Vector3d &pt,
+                     const int id,
+                     const cv::Scalar &color);
+
+    [[maybe_unused]] std::vector<Eigen::Vector3d> triangulate_tdv(const Eigen::Matrix<double, 3, 4> &P1,
+                                                                  const Eigen::Matrix<double, 3, 4> &P2,
+                                                                  const std::vector<cv::Point2d> &u1,
+                                                                  const std::vector<cv::Point2d> &u2);
+
+    [[maybe_unused]] cv::Scalar generate_random_color();
+
+    [[maybe_unused]] void draw_epipolar_line(cv::Mat &img,
+                                             std::vector<cv::Point3f> &line,
+                                             const std::vector<cv::Point2f> &pts);
+
+    [[maybe_unused]] Eigen::Vector3d estimate_point_between_rays(const std::string &nodename,
+                                                                 const Eigen::Vector3d &o1,
+                                                                 const Eigen::Vector3d &o2,
+                                                                 const Eigen::Vector3d &r1,
+                                                                 const Eigen::Vector3d &r2);
+
 }
 
 
