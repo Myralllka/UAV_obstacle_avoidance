@@ -45,25 +45,6 @@ namespace camera_localization {
         pl.loadParam("corresp/debug_markers", m_debug_markers);
         pl.loadParam("corresp/debug_projective_error", m_debug_projection_error);
 
-        // debug fnames
-        pl.loadParam("log_filenames/debug_dump_to_files", m_debug_log_files);
-        if (m_debug_log_files) {
-            std::string prefix;
-            pl.loadParam("log_filenames/absolute_path_prefix", prefix);
-            pl.loadParam("log_filenames/distance", m_plane_dist);
-            pl.loadParam("log_filenames/generate_plane", m_generate_artificial_plane);
-
-            m_fname_rms_repro = prefix + std::to_string(m_plane_dist) +
-                                pl.loadParam2("log_filenames/rms_reprojection_error", std::string{});
-            m_fname_total_repro = prefix + std::to_string(m_plane_dist) +
-                                  pl.loadParam2("log_filenames/total_reprojection_error", std::string{});
-            m_fname_dist_cam_plane = prefix + std::to_string(m_plane_dist) +
-                                     pl.loadParam2("log_filenames/distance_camera_plane", std::string{});
-            m_fname_dist_pts_to_plane = prefix + std::to_string(m_plane_dist) +
-                                        pl.loadParam2("log_filenames/distance_each_pt_to_plane", std::string{});
-            m_fname_disp_mean = prefix + std::to_string(m_plane_dist) +
-                                pl.loadParam2("log_filenames/disparity_mean", std::string{});
-        }
         // image matching and filtering parameters
         int tmp_thr;
         pl.loadParam("corresp/distance_threshold_px", tmp_thr);
@@ -101,13 +82,8 @@ namespace camera_localization {
 
         m_pub_pcld = nh.advertise<sensor_msgs::PointCloud2>("tdpts", 1, true);
         m_pub_markarray = nh.advertise<visualization_msgs::MarkerArray>("markerarray", 1);
-        m_pub_markplane = nh.advertise<visualization_msgs::MarkerArray>("plane", 1);
         m_pub_im_corresp = nh.advertise<sensor_msgs::Image>("im_corresp", 1);
         // | ---------------- subscribers initialize ------------------ |
-        m_sub_tdpts = nh.subscribe("tdpts",
-                                   1,
-                                   &CameraLocalization::m_cbk_pcl_plane,
-                                   this);
 
         // | --------------------- tf transformer --------------------- |
         m_transformer = mrs_lib::Transformer("CameraLocalization");
@@ -221,69 +197,7 @@ namespace camera_localization {
     }
 
 // | ---------------------- msg callbacks --------------------- |
-    [[maybe_unused]] void CameraLocalization::m_cbk_pcl_plane(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr &pts) {
-        if (not m_is_initialized) return;
 
-        if (pts->size() < 4) {
-            ROS_ERROR_THROTTLE(1.0, "[%s]: point cloud callback: not enough pts detected!", NODENAME.c_str());
-            if (m_debug_log_files) {
-                std::ofstream f_pts, f_dist;
-                f_pts.open(m_fname_dist_pts_to_plane, std::ios_base::app);
-                f_dist.open(m_fname_dist_cam_plane, std::ios_base::app);
-                f_dist << "0 \n";
-                f_pts << "0 \n";
-            }
-            return;
-        }
-
-        Eigen::Vector4d plane;
-        if (m_generate_artificial_plane) {
-            plane = {1, 0, 0, -m_plane_dist};
-
-            m_pub_markplane.publish(create_marker_plane(plane, m_name_base, cv::Scalar(0, 100, 0)));
-            ROS_INFO("[%s]: DISTANCE TO THE ESTIMATED PLANE = %.4f",
-                     NODENAME.c_str(),
-                     dist_plane2pt(plane, {0, 0, 0}));
-            if (m_debug_log_files) {
-                std::ofstream f_pts, f_dist;
-                f_pts.open(m_fname_dist_pts_to_plane, std::ios_base::app);
-                f_dist.open(m_fname_dist_cam_plane, std::ios_base::app);
-                double total_dist = 0;
-                for (const auto &point: pts->points) {
-                    const auto dist = dist_plane2pt(plane, point);
-                    total_dist += dist;
-                    f_pts << dist << ", ";
-                }
-                f_pts << ", \n";
-                std::cout << total_dist / pts->points.size() << std::endl;
-                f_dist << total_dist / pts->points.size() << std::endl;
-            }
-        } else {
-            auto plane_opt = best_plane_from_points_RANSAC(pts);
-            if (plane_opt.has_value()) {
-                plane = std::get<0>(plane_opt.value());
-                std::vector<int> inliers = std::get<1>(plane_opt.value());
-                m_pub_markplane.publish(create_marker_plane(plane, m_name_base, cv::Scalar(0, 100, 0)));
-                ROS_INFO("[%s]: DISTANCE TO THE ESTIMATED PLANE = %.4f",
-                         NODENAME.c_str(),
-                         dist_plane2pt(plane, {0, 0, 0}));
-                if (m_debug_log_files) {
-                    std::ofstream f_pts, f_dist;
-                    f_pts.open(m_fname_dist_pts_to_plane, std::ios_base::app);
-                    f_dist.open(m_fname_dist_cam_plane, std::ios_base::app);
-                    f_dist << dist_plane2pt(plane, {0, 0, 0}) << ", \n";
-                    for (const auto &i: inliers) {
-                        const auto dist = dist_plane2pt(plane, pts->points[i]);
-                        f_pts << dist << ", ";
-                    }
-                    f_pts << ", \n";
-                }
-            } else {
-                ROS_ERROR_THROTTLE(1.0, "[%s]: point cloud callback: no plane detected!", NODENAME.c_str());
-                return;
-            }
-        }
-    }
 // | --------------------- timer callbacks -------------------- |
 
     void CameraLocalization::m_tim_cbk_corresp([[maybe_unused]] const ros::TimerEvent &ev) {
@@ -390,16 +304,6 @@ namespace camera_localization {
                      NODENAME.c_str(),
                      res_total_reprojection_error,
                      std::sqrt(res_total_reprojection_error_RMS / res_pts_3d.size()));
-            if (m_debug_log_files) {
-                std::ofstream f_rms, f_total, f_mdisp;
-                f_rms.open(m_fname_rms_repro, std::ios_base::app);
-                f_total.open(m_fname_total_repro, std::ios_base::app);
-                f_mdisp.open(m_fname_disp_mean, std::ios_base::app);
-
-                f_rms << res_total_reprojection_error_RMS << "\n";
-                f_total << res_total_reprojection_error << "\n";
-                f_mdisp << total_disparity / kpts_filtered_1.size() << " \n";
-            }
             if (m_debug_markers) {
                 for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
                     const auto cv_ray1 = m_camera_left.projectPixelTo3dRay(kpts_filtered_1[i]);
@@ -461,7 +365,6 @@ namespace camera_localization {
         } else {
             ROS_WARN_THROTTLE(2.0, "[%s]: No new images to search for correspondences", NODENAME.c_str());
         }
-//        ros::Duration{0.5}.sleep();
     }
 
 

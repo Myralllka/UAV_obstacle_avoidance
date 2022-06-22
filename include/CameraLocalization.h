@@ -62,17 +62,9 @@ namespace camera_localization {
         bool m_debug_distances;
         bool m_debug_markers;
         bool m_debug_projection_error;
-        bool m_debug_log_files;
-        bool m_generate_artificial_plane;
 
         /* ros parameters */
         std::string m_uav_name;
-        std::string m_fname_rms_repro;
-        std::string m_fname_total_repro;
-        std::string m_fname_dist_cam_plane;
-        std::string m_fname_dist_pts_to_plane;
-        std::string m_fname_disp;
-        std::string m_fname_disp_mean;
         double m_plane_dist;
 
         /* other parameters */
@@ -103,7 +95,7 @@ namespace camera_localization {
         mrs_lib::Transformer m_transformer;
 
         // | ---------------------- msg callbacks --------------------- |
-        [[maybe_unused]] void m_cbk_pcl_plane(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr &pts);
+
         // | --------------------- timer callbacks -------------------- |
 
         ros::Timer m_tim_corresp;
@@ -114,13 +106,11 @@ namespace camera_localization {
 
         ros::Publisher m_pub_im_corresp;
         ros::Publisher m_pub_markarray;
-        ros::Publisher m_pub_markplane;
         ros::Publisher m_pub_im_left_debug;
         ros::Publisher m_pub_im_right_debug;
         ros::Publisher m_pub_pcld;
 
         // | ----------------------- subscribers ---------------------- |
-        ros::Subscriber m_sub_tdpts;
         mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imleft;
         mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imright;
         mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo> m_handler_camleftinfo;
@@ -154,7 +144,6 @@ namespace camera_localization {
                                              std::vector<cv::DMatch> &res_matches,
                                              std::vector<cv::Point2d> &res_kpts1,
                                              std::vector<cv::Point2d> &res_kpts2);
-
 
 
     };
