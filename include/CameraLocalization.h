@@ -57,15 +57,13 @@ namespace camera_localization {
         const std::string NODENAME{"CameraLocalization"};
         /* flags */
         bool m_is_initialized = false;
+        bool m_debug_images;
         bool m_debug_matches;
-        bool m_debug_epipolar;
         bool m_debug_distances;
         bool m_debug_markers;
-        bool m_debug_projection_error;
 
         /* ros parameters */
         std::string m_uav_name;
-        double m_plane_dist;
 
         /* other parameters */
         std::string m_name_base;
@@ -113,8 +111,6 @@ namespace camera_localization {
         // | ----------------------- subscribers ---------------------- |
         mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imleft;
         mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imright;
-        mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo> m_handler_camleftinfo;
-        mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo> m_handler_camrightinfo;
 
         // | ---------------- pinhole camera models ------------------- |
         image_geometry::PinholeCameraModel m_camera_left;

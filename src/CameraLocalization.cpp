@@ -32,40 +32,24 @@ namespace camera_localization {
         pl.loadParam("cam_fleft_roi/x_y_w_h", lroi);
         pl.loadParam("cam_fright_roi/x_y_w_h", rroi);
 
-        // initiate masks for an image matching part
-        rect_l = cv::Rect{lroi[0], lroi[1], lroi[2], lroi[3]};
-        rect_r = cv::Rect{rroi[0], rroi[1], rroi[2], rroi[3]};
-        m_mask_left(rect_l) = cv::Scalar{255};
-        m_mask_right(rect_r) = cv::Scalar{255};
-
         // booleans for debug control
-        pl.loadParam("corresp/debug_epipolar", m_debug_epipolar);
-        pl.loadParam("corresp/debug_distances", m_debug_distances);
-        pl.loadParam("corresp/debug_matches", m_debug_matches);
-        pl.loadParam("corresp/debug_markers", m_debug_markers);
-        pl.loadParam("corresp/debug_projective_error", m_debug_projection_error);
+        pl.loadParam("debug_sett/debug_images", m_debug_images);
+        pl.loadParam("debug_sett/debug_distances", m_debug_distances);
+        pl.loadParam("debug_sett/debug_matches", m_debug_matches);
+        pl.loadParam("debug_sett/debug_markers", m_debug_markers);
 
         // image matching and filtering parameters
         int tmp_thr;
         pl.loadParam("corresp/distance_threshold_px", tmp_thr);
-        if (tmp_thr < 0) {
-            ROS_INFO_ONCE("[%s]: wrong distance_threshold_px parameter: should be x > 0", NODENAME.c_str());
-        }
-        m_distance_threshold = static_cast<size_t>(tmp_thr);
         pl.loadParam("corresp/distances_ratio", m_distance_ratio);
-        if ((m_distance_ratio > 1) or (m_distance_ratio < 0)) {
-            ROS_INFO_ONCE("[%s]: wrong distance_ration parameter: should be 0 < x < 1", NODENAME.c_str());
-        }
+
+        // detector initialization
         int n_features;
         pl.loadParam("corresp/n_features", n_features);
-        detector = cv::ORB::create(n_features);
-        // load the triangulation method
-        pl.loadParam("corresp/triangulation_method", m_method_triang);
-        if (not(m_method_triang == "svd" or m_method_triang == "primitive")) {
-            ROS_ERROR("[%s]: wrong triangulation method", NODENAME.c_str());
-        }
 
-        // intrinsic camera parameters (calibration matrices)
+        // load the triangulation method
+        pl.loadParam("algorithms/triangulation_method", m_method_triang);
+
         if (!pl.loadedSuccessfully()) {
             ROS_ERROR("[%s]: failed to load non-optional parameters!", NODENAME.c_str());
             ros::shutdown();
@@ -74,15 +58,41 @@ namespace camera_localization {
         }
         // | ---------------- some data post-processing --------------- |
 
+        detector = cv::ORB::create(n_features);
+
+        // initiate masks for an image matching part
+        rect_l = cv::Rect{lroi[0], lroi[1], lroi[2], lroi[3]};
+        rect_r = cv::Rect{rroi[0], rroi[1], rroi[2], rroi[3]};
+        m_mask_left(rect_l) = cv::Scalar{255};
+        m_mask_right(rect_r) = cv::Scalar{255};
+
+        if (tmp_thr < 0) {
+            ROS_ERROR("[%s]: wrong distance_threshold_px parameter: should be x > 0", NODENAME.c_str());
+        }
+        m_distance_threshold = static_cast<size_t>(tmp_thr);
+        if ((m_distance_ratio > 1) or (m_distance_ratio < 0)) {
+            ROS_ERROR("[%s]: wrong distance_ration parameter: should be 0 < x < 1", NODENAME.c_str());
+        }
+        if (not(m_method_triang == "svd" or m_method_triang == "primitive")) {
+            ROS_ERROR("[%s]: wrong triangulation method", NODENAME.c_str());
+        }
+
         // | ----------------- publishers initialize ------------------ |
 
-        // Just images for debug (epilines, error etc)
-        m_pub_im_left_debug = nh.advertise<sensor_msgs::Image>("left_debug", 1);
-        m_pub_im_right_debug = nh.advertise<sensor_msgs::Image>("right_debug", 1);
-
+        // module results publisher
         m_pub_pcld = nh.advertise<sensor_msgs::PointCloud2>("tdpts", 1, true);
-        m_pub_markarray = nh.advertise<visualization_msgs::MarkerArray>("markerarray", 1);
-        m_pub_im_corresp = nh.advertise<sensor_msgs::Image>("im_corresp", 1);
+
+        // images for debug
+        if (m_debug_images) {
+            m_pub_im_left_debug = nh.advertise<sensor_msgs::Image>("left_debug", 1);
+            m_pub_im_right_debug = nh.advertise<sensor_msgs::Image>("right_debug", 1);
+        }
+        if (m_debug_images) {
+            m_pub_markarray = nh.advertise<visualization_msgs::MarkerArray>("markerarray", 1);
+        }
+        if (m_debug_matches) {
+            m_pub_im_corresp = nh.advertise<sensor_msgs::Image>("im_corresp", 1);
+        }
         // | ---------------- subscribers initialize ------------------ |
 
         // | --------------------- tf transformer --------------------- |
@@ -90,9 +100,9 @@ namespace camera_localization {
         m_transformer.setDefaultPrefix(m_uav_name);
 
         // | -------------------- initialize timers ------------------- |
-        m_tim_corresp = nh.createTimer(ros::Duration(0.0001),
-                                       &CameraLocalization::m_tim_cbk_corresp,
-                                       this);
+//        m_tim_corresp = nh.createTimer(ros::Duration(0.00001),
+//                                       &CameraLocalization::m_tim_cbk_corresp,
+//                                       this);
 
         // | -------------------- other static preperation ------------------- |
 
@@ -101,28 +111,33 @@ namespace camera_localization {
         shopt.threadsafe = true;
         shopt.no_message_timeout = ros::Duration(1.0);
 
+        mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo> handler_camleftinfo, handler_camrightinfo;
+
         mrs_lib::construct_object(m_handler_imleft,
                                   shopt,
-                                  "/" + m_uav_name + "/basler_left/image_rect");
+                                  "/" + m_uav_name + "/basler_left/image_raw");
         mrs_lib::construct_object(m_handler_imright,
                                   shopt,
-                                  "/" + m_uav_name + "/basler_right/image_rect");
-        mrs_lib::construct_object(m_handler_camleftinfo,
+                                  "/" + m_uav_name + "/basler_right/image_raw");
+
+        mrs_lib::construct_object(handler_camleftinfo,
                                   shopt,
                                   "/" + m_uav_name + "/basler_left/camera_info");
-        mrs_lib::construct_object(m_handler_camrightinfo,
+        mrs_lib::construct_object(handler_camrightinfo,
                                   shopt,
                                   "/" + m_uav_name + "/basler_right/camera_info");
         // initialize cameras with pinhole modeller
-        while (not(m_handler_camleftinfo.newMsg() and m_handler_camrightinfo.newMsg())) {
+        while (not(handler_camleftinfo.newMsg() and handler_camrightinfo.newMsg())) {
             ROS_WARN_THROTTLE(1.0, "[%s]: waiting for camera info messages", NODENAME.c_str());
         }
 
-        m_camera_right.fromCameraInfo(m_handler_camrightinfo.getMsg());
-        m_camera_left.fromCameraInfo(m_handler_camleftinfo.getMsg());
+        m_camera_right.fromCameraInfo(handler_camrightinfo.getMsg());
+        m_camera_left.fromCameraInfo(handler_camleftinfo.getMsg());
 
-        m_K_CL_eig = f2K33(m_handler_camleftinfo.getMsg()->P);
-        m_K_CR_eig = f2K33(m_handler_camrightinfo.getMsg()->P);
+        m_K_CL_eig = f2K33(handler_camleftinfo.getMsg()->P);
+        m_K_CR_eig = f2K33(handler_camrightinfo.getMsg()->P);
+        handler_camleftinfo.stop();
+        handler_camrightinfo.stop();
 
         cv::eigen2cv(m_K_CL_eig, m_K_CL_cv);
         cv::eigen2cv(m_K_CR_eig, m_K_CR_cv);
@@ -207,7 +222,6 @@ namespace camera_localization {
 
             ROS_INFO_THROTTLE(2.0, "[%s]: looking for correspondences", NODENAME.c_str());
 
-            // use const + toCvShared
             const auto cv_image_left = cv_bridge::toCvShare(m_handler_imleft.getMsg(), "bgr8").get()->image;
             const auto cv_image_right = cv_bridge::toCvShare(m_handler_imright.getMsg(), "bgr8").get()->image;
 
@@ -279,31 +293,6 @@ namespace camera_localization {
                 colors.push_back(color);
             }
 
-            double res_total_reprojection_error = 0;
-            double res_total_reprojection_error_RMS = 0;
-
-            for (size_t i = 0; i < res_pts_3d.size(); ++i) {
-                const auto reproj_current = reprojection_error(m_P_L_eig, m_P_R_eig,
-                                                               res_pts_3d[i],
-                                                               kpts_filtered_1[i],
-                                                               kpts_filtered_2[i]);
-                res_total_reprojection_error += reproj_current;
-                res_total_reprojection_error_RMS += std::pow(reproj_current, 2);
-            }
-            double total_disparity = 0;
-            for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
-                auto curr = norm((kpts_filtered_1[i] - kpts_filtered_2[i]));
-                total_disparity += curr;
-            }
-
-            ROS_INFO("[%s]: mean_disparuity = %.4f",
-                     NODENAME.c_str(),
-                     total_disparity / kpts_filtered_1.size());
-
-            ROS_INFO("[%s]: total_repr_err = %.4f;\t RMS_repr %.4f",
-                     NODENAME.c_str(),
-                     res_total_reprojection_error,
-                     std::sqrt(res_total_reprojection_error_RMS / res_pts_3d.size()));
             if (m_debug_markers) {
                 for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
                     const auto cv_ray1 = m_camera_left.projectPixelTo3dRay(kpts_filtered_1[i]);
@@ -316,23 +305,12 @@ namespace camera_localization {
                     markerarr->markers.push_back(create_marker_pt(m_name_base, res_pts_3d[i], counter++, colors[i]));
                 }
             }
-            if (m_debug_projection_error or m_debug_distances) {
+            if (m_debug_distances) {
                 cv::Mat imright, imleft;
                 cv_image_right.copyTo(imright);
                 cv_image_left.copyTo(imleft);
                 cv::rectangle(imleft, rect_l, cv::Scalar{0, 100, 0}, 2);
                 cv::rectangle(imright, rect_r, cv::Scalar{0, 100, 0}, 2);
-                if (m_debug_projection_error) {
-                    for (size_t i = 0; i < kpts_filtered_1.size(); ++i) {
-                        const auto u_left = PX2u(m_P_L_eig, res_pts_3d[i]);
-                        const auto u_right = PX2u(m_P_R_eig, res_pts_3d[i]);
-
-                        cv::circle(imleft, u_left, 1, colors[i], 2);
-                        cv::circle(imright, u_right, 1, colors[i], 2);
-                        cv::line(imleft, u_left, kpts_filtered_1[i], colors[i], 2);
-                        cv::line(imright, u_right, kpts_filtered_2[i], colors[i], 2);
-                    }
-                }
                 if (m_debug_distances) {
                     for (size_t i = 0; i < res_pts_3d.size(); ++i) {
                         std::ostringstream out;
@@ -358,8 +336,9 @@ namespace camera_localization {
                 m_pub_im_left_debug.publish(cv_bridge::CvImage(std_msgs::Header(), "bgr8", imleft).toImageMsg());
                 m_pub_im_right_debug.publish(cv_bridge::CvImage(std_msgs::Header(), "bgr8", imright).toImageMsg());
             }
-
-            m_pub_markarray.publish(markerarr);
+            if (m_debug_markers) {
+                m_pub_markarray.publish(markerarr);
+            }
             auto pc = pts_to_cloud(res_pts_3d, m_name_base);
             m_pub_pcld.publish(pc);
         } else {

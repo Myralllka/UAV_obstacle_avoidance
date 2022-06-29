@@ -47,8 +47,6 @@
             <param name="camera2_fright_pose" type="string" value="$(arg camera2_fright_pose)"/>
             <rosparam file="$(find uav_camera_localization)/config/general.yaml"/>
             <rosparam file="$(find uav_camera_localization)/config/cameras_roi.yaml"/>
-            <!-- ROS parameters config file -->
-            <rosparam file="$(find uav_camera_localization)/config/cameras_roi.yaml"/>
 
             <!-- Subscribers (note that the topic names will also be remapped using the namespace as a prefix) -->
 

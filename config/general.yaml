@@ -1,12 +1,16 @@
 corresp:
-  n_features: 200
+  n_features: 500
   distance_threshold_px: 3
   distances_ratio: 0.5
   reprojection_error_px: 3
-  debug_matches: true
-  debug_epipolar: true
-  debug_markers: true
-  debug_projective_error: true
-  debug_distances: true
-  # triangulation method can be so-called primitive or svd
+
+debug_sett:
+  debug_images: false
+  debug_matches: false
+  debug_markers: false
+  debug_distances: false
+
+algorithms:
+#  triangulation method can be so-called primitive or svd
   triangulation_method: "svd"
+#  triangulation_method: "primitive"
