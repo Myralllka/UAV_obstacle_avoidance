@@ -10,24 +10,25 @@ windows:
       layout: tiled
       panes:
         - waitForRos; roslaunch pylon_camera morhunenko.launch
-  - rqt_imgs:
-      layout: tiled
-      panes:
+  #  - rqt_imgs:
+  #      layout: tiled
+  #      panes:
   #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fleft/tag_detections_image
   #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fright/tag_detections_image
-          - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localization/left_debug
-          - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localization/right_debug
+  #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localization/left_debug
+  #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localization/right_debug
   #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/im_corresp
   - rviz:
       layout: tiled
       panes:
-        - waitForRos; rviz -d $(rospack find basler_stereopair_driver)/rviz/config.rviz
+        - 'history -s "waitForRos; rviz -d $(rospack find basler_stereopair_driver)/rviz/config.rviz"'
   - basler_driver:
       layout: tiled
       panes:
         - waitForRos; roslaunch basler_stereopair_driver basler_stereopair_driver.launch is_calibrated:=true
   - uav_camera_localization:
-      layout: main-vertical
+      layout: even-horizontal
       panes:
         - waitForRos; roslaunch uav_camera_localization uav_camera_localization.launch
-        - history -s "rostopic echo /rosout | grep '\\[CameraLocalization\\]'"
+        - waitForRos; rostopic hz /uav1/basler_left/image_raw
+        - waitForRos; rostopic hz /uav1/camera_localization/tdpts

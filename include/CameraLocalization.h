@@ -70,6 +70,7 @@ namespace camera_localization {
         std::string m_name_CL;
         std::string m_name_CR;
         std::string m_method_triang;
+        std::string m_imgs_encoding;
 
         // | --------------------- Opencv transformer -------------------- |
         geometry_msgs::TransformStamped m_RL_transform, m_LR_transform;

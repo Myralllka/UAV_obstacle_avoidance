@@ -22,6 +22,7 @@ namespace camera_localization {
         mrs_lib::ParamLoader pl(nh, NODENAME);
 
         pl.loadParam("UAV_NAME", m_uav_name);
+        pl.loadParam("corresp/encoding", m_imgs_encoding);
 
         pl.loadParam("base_frame_pose", m_name_base);
         pl.loadParam("m_name_CL", m_name_CL);
@@ -100,9 +101,9 @@ namespace camera_localization {
         m_transformer.setDefaultPrefix(m_uav_name);
 
         // | -------------------- initialize timers ------------------- |
-//        m_tim_corresp = nh.createTimer(ros::Duration(0.00001),
-//                                       &CameraLocalization::m_tim_cbk_corresp,
-//                                       this);
+        m_tim_corresp = nh.createTimer(ros::Duration(0.0001),
+                                       &CameraLocalization::m_tim_cbk_corresp,
+                                       this);
 
         // | -------------------- other static preperation ------------------- |
 
@@ -142,7 +143,7 @@ namespace camera_localization {
         cv::eigen2cv(m_K_CL_eig, m_K_CL_cv);
         cv::eigen2cv(m_K_CR_eig, m_K_CR_cv);
 
-//        find base-to-right camera and base-to-left camera transformations
+        // find base-to-right camera and base-to-left camera transformations
         ros::Duration(1.0).sleep();
         setUp();
         ROS_INFO_ONCE("[CameraLocalization]: initialized");
@@ -219,11 +220,9 @@ namespace camera_localization {
         if (not m_is_initialized) return;
 
         if (m_handler_imleft.newMsg() and m_handler_imright.newMsg()) {
-
             ROS_INFO_THROTTLE(2.0, "[%s]: looking for correspondences", NODENAME.c_str());
-
-            const auto cv_image_left = cv_bridge::toCvShare(m_handler_imleft.getMsg(), "bgr8").get()->image;
-            const auto cv_image_right = cv_bridge::toCvShare(m_handler_imright.getMsg(), "bgr8").get()->image;
+            const auto cv_image_left = cv_bridge::toCvShare(m_handler_imleft.getMsg(), m_imgs_encoding).get()->image;
+            const auto cv_image_right = cv_bridge::toCvShare(m_handler_imright.getMsg(), m_imgs_encoding).get()->image;
 
             cv::Mat descriptor1, descriptor2;
             std::vector<cv::KeyPoint> keypoints1, keypoints2;
@@ -265,7 +264,8 @@ namespace camera_localization {
                                 cv::Scalar::all(-1), cv::Scalar::all(-1),
                                 std::vector<char>(),
                                 cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-                m_pub_im_corresp.publish(cv_bridge::CvImage(std_msgs::Header(), "bgr8", im_matches).toImageMsg());
+                m_pub_im_corresp.publish(
+                        cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, im_matches).toImageMsg());
                 ROS_INFO_THROTTLE(2.0, "[%s & OpenCV]: Correspondences published", NODENAME.c_str());
             }
             auto markerarr = boost::make_shared<visualization_msgs::MarkerArray>();
@@ -316,31 +316,23 @@ namespace camera_localization {
                         std::ostringstream out;
                         out.precision(2);
                         out << std::fixed << res_pts_3d[i].norm();
-                        cv::putText(imleft,
-                                    out.str(),
-                                    kpts_filtered_1[i],
-                                    cv::FONT_HERSHEY_PLAIN,
-                                    1,
-                                    colors[i],
-                                    2);
+                        cv::putText(imleft, out.str(), kpts_filtered_1[i],
+                                    cv::FONT_HERSHEY_PLAIN, 1, colors[i], 2);
 
-                        cv::putText(imright,
-                                    out.str(),
-                                    kpts_filtered_2[i],
-                                    cv::FONT_HERSHEY_PLAIN,
-                                    1,
-                                    colors[i],
-                                    2);
+                        cv::putText(imright, out.str(), kpts_filtered_2[i],
+                                    cv::FONT_HERSHEY_PLAIN, 1, colors[i], 2);
                     }
                 }
-                m_pub_im_left_debug.publish(cv_bridge::CvImage(std_msgs::Header(), "bgr8", imleft).toImageMsg());
-                m_pub_im_right_debug.publish(cv_bridge::CvImage(std_msgs::Header(), "bgr8", imright).toImageMsg());
+                m_pub_im_left_debug.publish(
+                        cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imleft).toImageMsg());
+                m_pub_im_right_debug.publish(
+                        cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imright).toImageMsg());
             }
             if (m_debug_markers) {
                 m_pub_markarray.publish(markerarr);
             }
-            auto pc = pts_to_cloud(res_pts_3d, m_name_base);
-            m_pub_pcld.publish(pc);
+            auto pc_res = pts_to_cloud(std::vector<Eigen::Vector3d>{}, m_name_base);
+            m_pub_pcld.publish(pc_res);
         } else {
             ROS_WARN_THROTTLE(2.0, "[%s]: No new images to search for correspondences", NODENAME.c_str());
         }

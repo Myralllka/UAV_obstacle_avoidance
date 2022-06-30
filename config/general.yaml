@@ -3,10 +3,11 @@ corresp:
   distance_threshold_px: 3
   distances_ratio: 0.5
   reprojection_error_px: 3
+  encoding: "bgr8"
 
 debug_sett:
-  debug_images: false
-  debug_matches: false
+  debug_images: true
+  debug_matches: true
   debug_markers: false
   debug_distances: false
 

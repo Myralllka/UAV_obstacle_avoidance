@@ -46,7 +46,8 @@ include_directories(include
         ${catkin_INCLUDE_DIRS}
         ${OpenCV_INCLUDE_DIRS}
         )
-
+set(CPU_BASELINE SSE4_2)
+set(CPU_BASELINE AVX2)
 add_library(${FILESNAME} src/${FILESNAME}.cpp src/Utils.cpp include/Utils.h)
 
 add_dependencies(${FILESNAME} ${${FILESNAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
