@@ -80,7 +80,7 @@ namespace camera_localization {
         cv::Ptr<cv::BFMatcher> matcher = cv::BFMatcher::create(cv::NORM_HAMMING, true);
         cv::Ptr<cv::Feature2D> detector;
         Eigen::Matrix<double, 3, 3> m_K_CL_eig, m_K_CR_eig;
-        cv::Mat m_K_CL_cv, m_K_CR_cv;
+        cv::Matx33d m_K_CL_cv, m_K_CR_cv;
         float m_distance_ratio;
         size_t m_distance_threshold;
         // TODO: generalize
@@ -113,6 +113,8 @@ namespace camera_localization {
         mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imleft;
         mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imright;
 
+        mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imleft_rect;
+        mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imright_rect;
         // | ---------------- pinhole camera models ------------------- |
         image_geometry::PinholeCameraModel m_camera_left;
         image_geometry::PinholeCameraModel m_camera_right;

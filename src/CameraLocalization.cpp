@@ -120,6 +120,14 @@ namespace camera_localization {
         mrs_lib::construct_object(m_handler_imright,
                                   shopt,
                                   "/" + m_uav_name + "/basler_right/image_raw");
+        if (m_debug_matches) {
+            mrs_lib::construct_object(m_handler_imleft_rect,
+                                      shopt,
+                                      "/" + m_uav_name + "/basler_left/image_rect");
+            mrs_lib::construct_object(m_handler_imright_rect,
+                                      shopt,
+                                      "/" + m_uav_name + "/basler_right/image_rect");
+        }
 
         mrs_lib::construct_object(handler_camleftinfo,
                                   shopt,
@@ -389,9 +397,31 @@ namespace camera_localization {
                                             std::vector<cv::Point2d> &res_kpts1,
                                             std::vector<cv::Point2d> &res_kpts2) {
 
-        for (const auto &matche: input_matches) {
-            const cv::Point2f pt1_2d = kpts1[matche.queryIdx].pt;
-            const cv::Point2f pt2_2d = kpts2[matche.trainIdx].pt;
+        const cv::Matx33d K1 = m_camera_left.intrinsicMatrix();
+        const cv::Matx33d K2 = m_camera_right.intrinsicMatrix();
+        ros::Duration(0.05).sleep();
+
+        const auto img_left_raw = cv_bridge::toCvCopy(m_handler_imleft.getMsg(), m_imgs_encoding).get()->image;
+        const auto img_left_rect = cv_bridge::toCvCopy(m_handler_imleft_rect.getMsg(), m_imgs_encoding).get()->image;
+
+        std::vector<cv::Scalar> colors;
+        for (size_t i = 0; i < kpts1.size(); ++i) {
+            const auto color = generate_random_color();
+            colors.push_back(color);
+        }
+        int counter = 0;
+        for (const auto &match: input_matches) {
+            const auto pt1_tmp = kpts1[match.queryIdx].pt;
+            const auto pt2_tmp = kpts2[match.trainIdx].pt;
+            const auto pt_1_projected = m_K_CL_cv * K1.inv() * cv::Point3d{pt1_tmp.x, pt1_tmp.y, 1};
+            const auto pt_2_projected = m_K_CR_cv * K2.inv() * cv::Point3d{pt2_tmp.x, pt2_tmp.y, 1};
+            std::cout << pt_1_projected << std::endl;
+            const cv::Point2f pt1_2d = cv::Point2d{pt_1_projected.x / pt_1_projected.z,
+                                                   pt_1_projected.y / pt_1_projected.z};
+            const cv::Point2f pt2_2d = cv::Point2d{pt_2_projected.x / pt_2_projected.z,
+                                                   pt_2_projected.y / pt_2_projected.z};
+            cv::circle(img_left_raw, pt1_tmp, 3, colors[counter]);
+            cv::circle(img_left_rect, pt1_2d, 3, colors[counter++]);
             const cv::Point3d ray1_cv = m_camera_left.projectPixelTo3dRay(pt1_2d);
             const cv::Point3d ray2_cv = m_camera_right.projectPixelTo3dRay(pt2_2d);
             const auto ray1_opt = m_transformer.transformAsVector(Eigen::Vector3d{ray1_cv.x, ray1_cv.y, ray1_cv.z},
@@ -422,12 +452,15 @@ namespace camera_localization {
                 ROS_WARN_THROTTLE(1.0, "filtered corresp");
                 continue;
             }
-            res_kpts1.push_back(kpts1[matche.queryIdx].pt);
-            res_kpts2.push_back(kpts2[matche.trainIdx].pt);
-            res_matches.push_back(matche);
+            res_kpts1.push_back(kpts1[match.queryIdx].pt);
+            res_kpts2.push_back(kpts2[match.trainIdx].pt);
+            res_matches.push_back(match);
         }
-    }
-}  // namespace camera_localization
-
+        m_pub_im_left_debug.publish(
+                cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, img_left_raw).toImageMsg());
+        m_pub_im_right_debug.publish(
+                cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, img_left_rect).toImageMsg());
+    }  // namespace camera_localization
+}
 /* every nodelet must export its class as nodelet plugin */
 PLUGINLIB_EXPORT_CLASS(camera_localization::CameraLocalization, nodelet::Nodelet)
