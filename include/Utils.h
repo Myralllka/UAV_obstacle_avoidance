@@ -80,11 +80,15 @@ namespace camera_localization {
 
     [[maybe_unused]] Eigen::Vector3d cross(const Eigen::Vector3d &a, const Eigen::Vector3d &b);
 
+    [[maybe_unused]] cv::Point3d cross(const cv::Point2d &a, const cv::Point2d &b);
+
     [[maybe_unused]] std::pair<cv::Point2d, cv::Point2d> line2image(const cv::Point3d &line, int imwidth);
 
     [[maybe_unused]] void normalize_point(Eigen::Vector3d &p);
 
     [[maybe_unused]] void normalize_line(Eigen::Vector3d &p);
+
+    [[maybe_unused]] void normalize_line(cv::Point3d &p);
 
     [[maybe_unused]] cv::Point2d PX2u(const Eigen::Matrix<double, 3, 4> &P,
                                       const Eigen::Vector3d &x);
@@ -110,8 +114,8 @@ namespace camera_localization {
     [[maybe_unused]] Eigen::Vector3d closest_pt(const Eigen::Vector4d &plane,
                                                 const Eigen::Vector3d &pt);
 
-    [[maybe_unused]] sensor_msgs::PointCloud2 pts_to_cloud(const std::vector<Eigen::Vector3d> &pts,
-                                                           const std::string &base);
+    [[maybe_unused]] sensor_msgs::PointCloud2 pts2cloud(const std::vector<Eigen::Vector3d> &pts,
+                                                        const std::string &base);
 
     [[maybe_unused]] visualization_msgs::Marker
     create_marker_pt(const std::string &base,

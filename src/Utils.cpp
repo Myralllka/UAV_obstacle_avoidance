@@ -40,6 +40,12 @@ namespace camera_localization {
                 a.x() * b.y() - a.y() * b.x()};
     }
 
+    [[maybe_unused]] cv::Point3d cross(const cv::Point2d &a, const cv::Point2d &b) {
+        return {a.y - b.y,
+                b.x - a.x,
+                a.x * b.y - a.y * b.x};
+    }
+
     [[maybe_unused]] std::pair<cv::Point2d, cv::Point2d> line2image(const cv::Point3d &line, int imwidth) {
         auto x0 = .0f;
         auto x1 = static_cast<double>(imwidth);
@@ -64,6 +70,13 @@ namespace camera_localization {
         p.x() /= div;
         p.y() /= div;
         p.z() /= div;
+    }
+
+    [[maybe_unused]] void normalize_line(cv::Point3d &p) {
+        auto div = std::sqrt(std::pow(p.x, 2) + std::pow(p.y, 2));
+        p.x /= div;
+        p.y /= div;
+        p.z /= div;
     }
 
     [[maybe_unused]] cv::Point2d PX2u(const Eigen::Matrix<double, 3, 4> &P,
@@ -232,8 +245,8 @@ namespace camera_localization {
                          inliers->indices};
     }
 
-    sensor_msgs::PointCloud2 pts_to_cloud(const std::vector<Eigen::Vector3d> &pts,
-                                          const std::string &base) {
+    sensor_msgs::PointCloud2 pts2cloud(const std::vector<Eigen::Vector3d> &pts,
+                                       const std::string &base) {
         //convert point cloud image to ros message
 
         //figure out number of points

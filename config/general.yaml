@@ -1,8 +1,8 @@
 corresp:
   n_features: 500
-  distance_threshold_px: 3
-  distances_ratio: 0.5
-  reprojection_error_px: 3
+  distance_threshold_px: 2
+  distances_ratio: 1
+  reprojection_error_px: 2
   encoding: "bgr8"
 
 debug_sett:

@@ -135,14 +135,12 @@ namespace camera_localization {
                                                         std::vector<cv::KeyPoint> &res_kpts,
                                                         cv::Mat &res_desk);
 
-        [[maybe_unused]] void filter_matches(const std::vector<cv::DMatch> &input_matches,
-                                             const std::vector<cv::KeyPoint> &kpts1,
-                                             const std::vector<cv::KeyPoint> &kpts2,
-                                             const cv::Point2d &o1_2d,
-                                             const cv::Point2d &o2_2d,
-                                             std::vector<cv::DMatch> &res_matches,
-                                             std::vector<cv::Point2d> &res_kpts1,
-                                             std::vector<cv::Point2d> &res_kpts2);
+        [[maybe_unused]] void
+        filter_matches(const std::vector<cv::DMatch> &input_matches, const std::vector<cv::KeyPoint> &kpts1,
+                       const std::vector<cv::KeyPoint> &kpts2, const cv::Point2d &o1_2d,
+                       const cv::Point2d &o2_2d, std::vector<cv::DMatch> &res_matches,
+                       std::vector<cv::Point2d> &res_kpts1, std::vector<cv::Point2d> &res_kpts2,
+                       std::vector<cv::Point2d> &res_kpts1_rect, std::vector<cv::Point2d> &res_kpts2_rect);
 
 
     };
