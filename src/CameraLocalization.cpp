@@ -48,7 +48,7 @@ namespace camera_localization {
         int n_features;
         pl.loadParam("corresp/n_features", n_features);
 
-        // load the triangulation method
+        // load algorithms
         pl.loadParam("algorithms/triangulation_method", m_method_triang);
 
         if (!pl.loadedSuccessfully()) {
@@ -58,7 +58,6 @@ namespace camera_localization {
             ROS_INFO_ONCE("[%s]: loaded parameters", NODENAME.c_str());
         }
         // | ---------------- some data post-processing --------------- |
-
         detector = cv::ORB::create(n_features);
 
         // initiate masks for an image matching part
@@ -335,9 +334,9 @@ namespace camera_localization {
             if (m_debug_markers) {
                 m_pub_markarray.publish(markerarr);
             }
-//            auto pc_res = pts2cloud(res_pts_3d, m_name_base);
-            sensor_msgs::PointCloud2 a;
-            m_pub_pcld.publish(a);
+            auto pc_res = pts2cloud(res_pts_3d, m_name_base);
+//            sensor_msgs::PointCloud2 pc_res;
+            m_pub_pcld.publish(pc_res);
         } else {
             ROS_WARN_THROTTLE(2.0, "[%s]: No new images to search for correspondences", NODENAME.c_str());
         }

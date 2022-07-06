@@ -70,13 +70,15 @@ namespace camera_localization {
         std::string m_name_CL;
         std::string m_name_CR;
         std::string m_method_triang;
+        std::string m_method_detect;
         std::string m_imgs_encoding;
 
-        // | --------------------- Opencv transformer -------------------- |
+        // | --------------------- Opencv -------------------- |
         geometry_msgs::TransformStamped m_RL_transform, m_LR_transform;
         cv::Mat m_P_L_cv, m_P_R_cv;
         Eigen::Matrix<double, 3, 4> m_P_R_eig, m_P_L_eig;
 
+        // | --------------------- Detectors -------------------- |
         cv::Ptr<cv::BFMatcher> matcher = cv::BFMatcher::create(cv::NORM_HAMMING, true);
         cv::Ptr<cv::Feature2D> detector;
         Eigen::Matrix<double, 3, 3> m_K_CL_eig, m_K_CR_eig;
@@ -113,8 +115,6 @@ namespace camera_localization {
         mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imleft;
         mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imright;
 
-        mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imleft_rect;
-        mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imright_rect;
         // | ---------------- pinhole camera models ------------------- |
         image_geometry::PinholeCameraModel m_camera_left;
         image_geometry::PinholeCameraModel m_camera_right;
@@ -141,7 +141,6 @@ namespace camera_localization {
                        const cv::Point2d &o2_2d, std::vector<cv::DMatch> &res_matches,
                        std::vector<cv::Point2d> &res_kpts1, std::vector<cv::Point2d> &res_kpts2,
                        std::vector<cv::Point2d> &res_kpts1_rect, std::vector<cv::Point2d> &res_kpts2_rect);
-
 
     };
 //}
