@@ -39,10 +39,10 @@
 #include <opencv2/features2d.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/eigen.hpp>
+#include <opencv2/core/ocl.hpp>
 
 #include "Utils.h"
 //}
-
 namespace camera_localization {
 
 /* class Cameralocalization //{ */
@@ -87,8 +87,8 @@ namespace camera_localization {
         size_t m_distance_threshold;
         // TODO: generalize
         cv::Rect rect_l, rect_r;
-        cv::Mat m_mask_left{cv::Mat::zeros(cv::Size{1600, 1200}, CV_8U)};
-        cv::Mat m_mask_right{cv::Mat::zeros(cv::Size{1600, 1200}, CV_8U)};
+        cv::UMat m_mask_left{cv::UMat::zeros(cv::Size{1600, 1200}, CV_8U)};
+        cv::UMat m_mask_right{cv::UMat::zeros(cv::Size{1600, 1200}, CV_8U)};
 
         Eigen::Affine3d m_fleft_pose, m_fright_pose;
         // | --------------------- MRS transformer -------------------- |
@@ -130,10 +130,10 @@ namespace camera_localization {
         [[maybe_unused]] std::vector<Eigen::Vector3d> triangulate_primitive(const std::vector<cv::Point2d> &kpts1,
                                                                             const std::vector<cv::Point2d> &kpts2);
 
-        [[maybe_unused]] void m_detect_and_compute_kpts(const cv::Mat &img,
-                                                        const cv::Mat &mask,
+        [[maybe_unused]] void m_detect_and_compute_kpts(const cv::UMat &img,
+                                                        const cv::UMat &mask,
                                                         std::vector<cv::KeyPoint> &res_kpts,
-                                                        cv::Mat &res_desk);
+                                                        cv::UMat &res_desk);
 
         [[maybe_unused]] void
         filter_matches(const std::vector<cv::DMatch> &input_matches, const std::vector<cv::KeyPoint> &kpts1,

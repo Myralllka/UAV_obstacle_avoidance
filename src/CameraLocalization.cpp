@@ -8,6 +8,9 @@ namespace camera_localization {
 /* onInit() method //{ */
     void CameraLocalization::onInit() {
 
+        if (cv::ocl::haveOpenCL()) {
+            cv::ocl::setUseOpenCL(true);
+        }
         // | ---------------- set my booleans to false ---------------- |
 
         /* obtain node handle */
@@ -219,14 +222,16 @@ namespace camera_localization {
 
         if (m_handler_imleft.newMsg() and m_handler_imright.newMsg()) {
             ROS_INFO_THROTTLE(2.0, "[%s]: looking for correspondences", NODENAME.c_str());
-            const auto cv_image_left = cv_bridge::toCvShare(m_handler_imleft.getMsg(), m_imgs_encoding).get()->image;
-            const auto cv_image_right = cv_bridge::toCvShare(m_handler_imright.getMsg(), m_imgs_encoding).get()->image;
+            const auto cv_image_left = cv_bridge::toCvShare(m_handler_imleft.getMsg(),
+                                                            m_imgs_encoding).get()->image;
+            const auto cv_image_right = cv_bridge::toCvShare(m_handler_imright.getMsg(),
+                                                             m_imgs_encoding).get()->image;
 
-            cv::Mat descriptor1, descriptor2;
+            cv::UMat descriptor1, descriptor2;
             std::vector<cv::KeyPoint> keypoints1, keypoints2;
 
-            m_detect_and_compute_kpts(cv_image_left, m_mask_left, keypoints1, descriptor1);
-            m_detect_and_compute_kpts(cv_image_right, m_mask_right, keypoints2, descriptor2);
+            m_detect_and_compute_kpts(cv_image_left.getUMat(cv::ACCESS_READ), m_mask_left, keypoints1, descriptor1);
+            m_detect_and_compute_kpts(cv_image_right.getUMat(cv::ACCESS_READ), m_mask_right, keypoints2, descriptor2);
             // detect features and compute correspondances
 
             if ((keypoints1.size() < 10) or (keypoints2.size() < 10)) {
@@ -238,7 +243,7 @@ namespace camera_localization {
             matcher->match(descriptor1,
                            descriptor2,
                            matches,
-                           cv::Mat());
+                           cv::UMat());
             // drop bad matches
             std::sort(matches.begin(), matches.end());
             const int num_good_matches = static_cast<int>(std::round(static_cast<double>(matches.size()) *
@@ -370,12 +375,12 @@ namespace camera_localization {
         return res_pc;
     }
 
-    void CameraLocalization::m_detect_and_compute_kpts(const cv::Mat &img,
-                                                       const cv::Mat &mask,
+    void CameraLocalization::m_detect_and_compute_kpts(const cv::UMat &img,
+                                                       const cv::UMat &mask,
                                                        std::vector<cv::KeyPoint> &res_kpts,
-                                                       cv::Mat &res_desk) {
+                                                       cv::UMat &res_desk) {
         // Find all kpts on a bw image using the ORB detector
-        cv::Mat img_gray;
+        cv::UMat img_gray;
         cv::cvtColor(img, img_gray, cv::COLOR_BGR2GRAY);
 
         detector->detectAndCompute(img_gray,
