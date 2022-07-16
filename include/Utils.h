@@ -114,8 +114,8 @@ namespace camera_localization {
     [[maybe_unused]] Eigen::Vector3d closest_pt(const Eigen::Vector4d &plane,
                                                 const Eigen::Vector3d &pt);
 
-    [[maybe_unused]] sensor_msgs::PointCloud2 pts2cloud(const std::vector<Eigen::Vector3d> &pts,
-                                                        const std::string &base);
+    [[maybe_unused]] void
+    pts2cloud(const std::vector<Eigen::Vector3d> &pts, boost::shared_ptr<sensor_msgs::PointCloud2> &res_cloud, const std::string &base);
 
     [[maybe_unused]] visualization_msgs::Marker
     create_marker_pt(const std::string &base,

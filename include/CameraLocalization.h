@@ -57,6 +57,7 @@ namespace camera_localization {
         const std::string NODENAME{"CameraLocalization"};
         /* flags */
         bool m_is_initialized = false;
+        std::atomic<bool> m_is_fleft_available, m_is_right_available;
         bool m_debug_images;
         bool m_debug_matches;
         bool m_debug_distances;
@@ -96,6 +97,9 @@ namespace camera_localization {
         mrs_lib::Transformer m_transformer;
 
         // | ---------------------- msg callbacks --------------------- |
+        void m_cbk_camfleft(const sensor_msgs::Image::ConstPtr &msg);
+
+        void m_cbk_camfright(const sensor_msgs::Image::ConstPtr &msg);
 
         // | --------------------- timer callbacks -------------------- |
 
@@ -112,8 +116,19 @@ namespace camera_localization {
         ros::Publisher m_pub_pcld;
 
         // | ----------------------- subscribers ---------------------- |
-        mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imleft;
-        mrs_lib::SubscribeHandler<sensor_msgs::Image> m_handler_imright;
+        ros::Subscriber m_sub_camfleft;
+        ros::Subscriber m_sub_camfright;
+
+        // | ------------------- detection modules -------------------- |
+        void det_and_comp_cbk_general(const sensor_msgs::Image::ConstPtr &msg,
+                                      const std::string &im_encoding,
+                                      const cv::UMat &mask,
+                                      cv::Mat &desc,
+                                      std::vector<cv::KeyPoint> &kpts);
+
+        std::mutex m_mut_pts_left, m_mut_pts_right;
+        cv::Mat m_desc_left, m_desc_right;
+        std::vector<cv::KeyPoint> m_kpts_left, m_kpts_right;
 
         // | ---------------- pinhole camera models ------------------- |
         image_geometry::PinholeCameraModel m_camera_left;
@@ -133,7 +148,7 @@ namespace camera_localization {
         [[maybe_unused]] void m_detect_and_compute_kpts(const cv::UMat &img,
                                                         const cv::UMat &mask,
                                                         std::vector<cv::KeyPoint> &res_kpts,
-                                                        cv::UMat &res_desk);
+                                                        cv::Mat &res_desk);
 
         [[maybe_unused]] void
         filter_matches(const std::vector<cv::DMatch> &input_matches, const std::vector<cv::KeyPoint> &kpts1,

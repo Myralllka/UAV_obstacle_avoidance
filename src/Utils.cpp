@@ -245,34 +245,34 @@ namespace camera_localization {
                          inliers->indices};
     }
 
-    sensor_msgs::PointCloud2 pts2cloud(const std::vector<Eigen::Vector3d> &pts,
-                                       const std::string &base) {
+    void pts2cloud(const std::vector<Eigen::Vector3d> &pts,
+                   boost::shared_ptr<sensor_msgs::PointCloud2> &cloud,
+                   const std::string &base) {
         //convert point cloud image to ros message
 
         //figure out number of points
         size_t numpoints = pts.size();
 
         //declare message and sizes
-        sensor_msgs::PointCloud2 cloud;
-        cloud.header.frame_id = base;
-        cloud.header.stamp = ros::Time::now();
-        cloud.width = numpoints;
-        cloud.height = 1;
-        cloud.is_bigendian = false;
-        cloud.is_dense = false; // there may be invalid points
+        cloud->header.frame_id = base;
+        cloud->header.stamp = ros::Time::now();
+        cloud->width = numpoints;
+        cloud->height = 1;
+        cloud->is_bigendian = false;
+        cloud->is_dense = false; // there may be invalid points
 
         //for fields setup
-        sensor_msgs::PointCloud2Modifier modifier(cloud);
+        sensor_msgs::PointCloud2Modifier modifier(*cloud);
         modifier.setPointCloud2FieldsByString(2, "xyz", "rgb");
         modifier.resize(numpoints);
 
         //iterators
-        sensor_msgs::PointCloud2Iterator<float> out_x(cloud, "x");
-        sensor_msgs::PointCloud2Iterator<float> out_y(cloud, "y");
-        sensor_msgs::PointCloud2Iterator<float> out_z(cloud, "z");
-        sensor_msgs::PointCloud2Iterator<uint8_t> out_r(cloud, "r");
-        sensor_msgs::PointCloud2Iterator<uint8_t> out_g(cloud, "g");
-        sensor_msgs::PointCloud2Iterator<uint8_t> out_b(cloud, "b");
+        sensor_msgs::PointCloud2Iterator<float> out_x(*cloud, "x");
+        sensor_msgs::PointCloud2Iterator<float> out_y(*cloud, "y");
+        sensor_msgs::PointCloud2Iterator<float> out_z(*cloud, "z");
+        sensor_msgs::PointCloud2Iterator<uint8_t> out_r(*cloud, "r");
+        sensor_msgs::PointCloud2Iterator<uint8_t> out_g(*cloud, "g");
+        sensor_msgs::PointCloud2Iterator<uint8_t> out_b(*cloud, "b");
 
         for (size_t i = 0; i < pts.size(); ++i, ++out_x, ++out_y, ++out_z, ++out_r, ++out_g, ++out_b) {
             //get the image coordinate for this point and convert to mm
@@ -288,7 +288,6 @@ namespace camera_localization {
             *out_g = 66;
             *out_b = 66;
         }
-        return cloud;
     }
 
     visualization_msgs::Marker
