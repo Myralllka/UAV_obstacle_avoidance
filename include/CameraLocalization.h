@@ -42,6 +42,7 @@
 #include <opencv2/core/ocl.hpp>
 
 #include "Utils.h"
+#include "barrier.hpp"
 //}
 namespace camera_localization {
 
@@ -57,8 +58,7 @@ namespace camera_localization {
         const std::string NODENAME{"CameraLocalization"};
         /* flags */
         bool m_is_initialized = false;
-        std::atomic<bool> m_is_fleft_available, m_is_right_available;
-        bool m_debug_images;
+        std::atomic<bool> m_is_fleft_available = false, m_is_right_available = false;
         bool m_debug_matches;
         bool m_debug_distances;
         bool m_debug_markers;
@@ -81,15 +81,16 @@ namespace camera_localization {
 
         // | --------------------- Detectors -------------------- |
         cv::Ptr<cv::BFMatcher> matcher = cv::BFMatcher::create(cv::NORM_HAMMING, true);
-        cv::Ptr<cv::Feature2D> detector;
+        cv::Ptr<cv::Feature2D> detector_left;
+        cv::Ptr<cv::Feature2D> detector_right;
         Eigen::Matrix<double, 3, 3> m_K_CL_eig, m_K_CR_eig;
         cv::Matx33d m_K_CL_cv, m_K_CR_cv;
         float m_distance_ratio;
         size_t m_distance_threshold;
         // TODO: generalize
         cv::Rect rect_l, rect_r;
-        cv::UMat m_mask_left{cv::UMat::zeros(cv::Size{1600, 1200}, CV_8U)};
-        cv::UMat m_mask_right{cv::UMat::zeros(cv::Size{1600, 1200}, CV_8U)};
+        cv::Mat m_mask_left{cv::Mat::zeros(cv::Size{1600, 1200}, CV_8U)};
+        cv::Mat m_mask_right{cv::Mat::zeros(cv::Size{1600, 1200}, CV_8U)};
 
         Eigen::Affine3d m_fleft_pose, m_fright_pose;
         // | --------------------- MRS transformer -------------------- |
@@ -120,13 +121,14 @@ namespace camera_localization {
         ros::Subscriber m_sub_camfright;
 
         // | ------------------- detection modules -------------------- |
-        void det_and_comp_cbk_general(const sensor_msgs::Image::ConstPtr &msg,
-                                      const std::string &im_encoding,
-                                      const cv::UMat &mask,
-                                      cv::Mat &desc,
-                                      std::vector<cv::KeyPoint> &kpts);
+        void det_and_comp_cbk_general(const sensor_msgs::Image::ConstPtr &msg, const std::string &im_encoding,
+                                      const cv::Ptr<cv::Feature2D> &detector, const cv::Mat &mask, cv::Mat &desc,
+                                      std::vector<cv::KeyPoint> &kpts, std::mutex &mut);
 
         std::mutex m_mut_pts_left, m_mut_pts_right;
+
+        barrier m_barrier{3};
+        std::condition_variable m_cond_fleft, m_cond_fright;
         cv::Mat m_desc_left, m_desc_right;
         std::vector<cv::KeyPoint> m_kpts_left, m_kpts_right;
 
@@ -144,11 +146,6 @@ namespace camera_localization {
 
         [[maybe_unused]] std::vector<Eigen::Vector3d> triangulate_primitive(const std::vector<cv::Point2d> &kpts1,
                                                                             const std::vector<cv::Point2d> &kpts2);
-
-        [[maybe_unused]] void m_detect_and_compute_kpts(const cv::UMat &img,
-                                                        const cv::UMat &mask,
-                                                        std::vector<cv::KeyPoint> &res_kpts,
-                                                        cv::Mat &res_desk);
 
         [[maybe_unused]] void
         filter_matches(const std::vector<cv::DMatch> &input_matches, const std::vector<cv::KeyPoint> &kpts1,

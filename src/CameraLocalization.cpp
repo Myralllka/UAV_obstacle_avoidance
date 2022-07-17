@@ -8,9 +8,9 @@ namespace camera_localization {
 /* onInit() method //{ */
     void CameraLocalization::onInit() {
 
-        if (cv::ocl::haveOpenCL()) {
-            cv::ocl::setUseOpenCL(true);
-        }
+//        if (cv::ocl::haveOpenCL()) {
+//            cv::ocl::setUseOpenCL(true);
+//        }
         // | ---------------- set my booleans to false ---------------- |
 
         /* obtain node handle */
@@ -37,7 +37,6 @@ namespace camera_localization {
         pl.loadParam("cam_fright_roi/x_y_w_h", rroi);
 
         // booleans for debug control
-        pl.loadParam("debug_sett/debug_images", m_debug_images);
         pl.loadParam("debug_sett/debug_distances", m_debug_distances);
         pl.loadParam("debug_sett/debug_matches", m_debug_matches);
         pl.loadParam("debug_sett/debug_markers", m_debug_markers);
@@ -61,7 +60,8 @@ namespace camera_localization {
             ROS_INFO_ONCE("[%s]: loaded parameters", NODENAME.c_str());
         }
         // | ---------------- some data post-processing --------------- |
-        detector = cv::ORB::create(n_features);
+        detector_left = cv::ORB::create(n_features);
+        detector_right = cv::ORB::create(n_features);
 
         // initiate masks for an image matching part
         rect_l = cv::Rect{lroi[0], lroi[1], lroi[2], lroi[3]};
@@ -83,14 +83,14 @@ namespace camera_localization {
         // | ----------------- publishers initialize ------------------ |
 
         // module results publisher
-        m_pub_pcld = nh.advertise<sensor_msgs::PointCloud2>("tdpts", 1, true);
+        m_pub_pcld = nh.advertise<sensor_msgs::PointCloud2>("tdpts", 8, true);
 
         // images for debug
-        if (m_debug_images) {
-            m_pub_im_left_debug = nh.advertise<sensor_msgs::Image>("left_debug", 1);
-            m_pub_im_right_debug = nh.advertise<sensor_msgs::Image>("right_debug", 1);
+        if (m_debug_distances) {
+            m_pub_im_left_debug = nh.advertise<sensor_msgs::Image>("image_left_debug", 1);
+            m_pub_im_right_debug = nh.advertise<sensor_msgs::Image>("image_right_debug", 1);
         }
-        if (m_debug_images) {
+        if (m_debug_markers) {
             m_pub_markarray = nh.advertise<visualization_msgs::MarkerArray>("markerarray", 1);
         }
         if (m_debug_matches) {
@@ -112,7 +112,8 @@ namespace camera_localization {
         m_transformer.setDefaultPrefix(m_uav_name);
 
         // | -------------------- initialize timers ------------------- |
-        m_tim_corresp = nh.createTimer(ros::Duration(0.02),
+        // here ros::Duration() should provide working rate of about 33hz
+        m_tim_corresp = nh.createTimer(ros::Duration(0.03),
                                        &CameraLocalization::m_tim_cbk_corresp,
                                        this);
 
@@ -219,35 +220,47 @@ namespace camera_localization {
 // | ---------------------- msg callbacks --------------------- |
     void CameraLocalization::det_and_comp_cbk_general(const sensor_msgs::Image::ConstPtr &msg,
                                                       const std::string &im_encoding,
-                                                      const cv::UMat &mask,
+                                                      const cv::Ptr<cv::Feature2D> &detector,
+                                                      const cv::Mat &mask,
                                                       cv::Mat &desc,
-                                                      std::vector<cv::KeyPoint> &kpts) {
-
+                                                      std::vector<cv::KeyPoint> &kpts,
+                                                      std::mutex &mut) {
+        cv::Mat desc_l, img_gray;
+        std::vector<cv::KeyPoint> kpts_l;
         const auto cv_image = cv_bridge::toCvShare(msg, im_encoding).get()->image;
-        m_detect_and_compute_kpts(cv_image.getUMat(cv::ACCESS_READ),
-                                  mask, kpts, desc);
+
+        cv::cvtColor(cv_image, img_gray, cv::COLOR_BGR2GRAY);
+
+        detector->detectAndCompute(img_gray,
+                                   mask,
+                                   kpts_l,
+                                   desc_l);
+
+        std::lock_guard lt{mut};
+        desc = desc_l;
+        kpts = kpts_l;
     }
 
     void CameraLocalization::m_cbk_camfleft(const sensor_msgs::Image::ConstPtr &msg) {
-        ROS_INFO_THROTTLE(2.0, "[%s]: looking for correspondences", NODENAME.c_str());
-        cv::Mat desc;
-        std::vector<cv::KeyPoint> kpts;
-        det_and_comp_cbk_general(msg, m_imgs_encoding, m_mask_left,
-                                 desc, kpts);
-        std::lock_guard lt{m_mut_pts_left};
-        m_kpts_left = kpts;
-        m_desc_left = desc;
+        det_and_comp_cbk_general(msg,
+                                 m_imgs_encoding,
+                                 detector_left,
+                                 m_mask_left,
+                                 m_desc_left,
+                                 m_kpts_left,
+                                 m_mut_pts_left);
+        m_barrier.wait();
     }
 
     void CameraLocalization::m_cbk_camfright(const sensor_msgs::Image::ConstPtr &msg) {
-        ROS_INFO_THROTTLE(2.0, "[%s]: looking for correspondences", NODENAME.c_str());
-        cv::Mat desc;
-        std::vector<cv::KeyPoint> kpts;
-        det_and_comp_cbk_general(msg, m_imgs_encoding, m_mask_right,
-                                 desc, kpts);
-        std::lock_guard lt{m_mut_pts_right};
-        m_kpts_right = kpts;
-        m_desc_right = desc;
+        det_and_comp_cbk_general(msg,
+                                 m_imgs_encoding,
+                                 detector_right,
+                                 m_mask_right,
+                                 m_desc_right,
+                                 m_kpts_right,
+                                 m_mut_pts_right);
+        m_barrier.wait();
     }
 
 // | --------------------- timer callbacks -------------------- |
@@ -256,11 +269,20 @@ namespace camera_localization {
         if (not m_is_initialized) return;
         ROS_WARN_THROTTLE(2.0, "[%s]: No new images to search for correspondences", NODENAME.c_str());
         cv::Mat descriptor1, descriptor2;
-        std::vector<cv::Mat> keypoints1, keypoints2;
-
+        std::vector<cv::KeyPoint> keypoints1, keypoints2;
+        auto time = ros::Time::now();
+        m_barrier.wait();
         {
+            // both mutexes are not available most of the time, so scoped lock
+            // can not be used here.
+            // in this particular case, deadlock should not happened
+            // because both mutexes are accessed from different threads.
             std::lock_guard l1{m_mut_pts_left};
-            std::lock_guard l2{m_mut_pts_left};
+            std::lock_guard l2{m_mut_pts_right};
+            descriptor1 = m_desc_left;
+            descriptor2 = m_desc_right;
+            keypoints1 = m_kpts_left;
+            keypoints2 = m_kpts_right;
         }
 
         if ((keypoints1.size() < 10) or (keypoints2.size() < 10)) {
@@ -272,7 +294,7 @@ namespace camera_localization {
         matcher->match(descriptor1,
                        descriptor2,
                        matches,
-                       cv::UMat());
+                       cv::Mat());
         // drop bad matches
         std::sort(matches.begin(), matches.end());
         const int num_good_matches = static_cast<int>(std::round(static_cast<double>(matches.size()) *
@@ -401,20 +423,6 @@ namespace camera_localization {
             }
         }
         return res_pc;
-    }
-
-    void CameraLocalization::m_detect_and_compute_kpts(const cv::UMat &img,
-                                                       const cv::UMat &mask,
-                                                       std::vector<cv::KeyPoint> &res_kpts,
-                                                       cv::Mat &res_desk) {
-        // Find all kpts on a bw image using the ORB detector
-        cv::UMat img_gray;
-        cv::cvtColor(img, img_gray, cv::COLOR_BGR2GRAY);
-
-        detector->detectAndCompute(img_gray,
-                                   mask,
-                                   res_kpts,
-                                   res_desk);
     }
 
     void CameraLocalization::filter_matches(const std::vector<cv::DMatch> &input_matches,

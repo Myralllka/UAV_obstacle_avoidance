@@ -50,10 +50,10 @@ include_directories(include
 set(CPU_BASELINE SSE4_2)
 set(CPU_BASELINE AVX2)
 set(CMAKE_BUILD_TYPE Release)
-add_library(${FILESNAME} src/${FILESNAME}.cpp src/Utils.cpp include/Utils.h)
+add_library(${FILESNAME} src/${FILESNAME}.cpp src/Utils.cpp include/Utils.h include/barrier.hpp)
 
 add_dependencies(${FILESNAME} ${${FILESNAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 target_link_libraries(${FILESNAME} ${catkin_LIBRARIES})
 target_link_libraries(${FILESNAME} ${OpenCV_LIBRARIES})
-target_link_libraries (${FILESNAME} ${Eigen_LIBRARIES})
+target_link_libraries(${FILESNAME} ${Eigen_LIBRARIES})

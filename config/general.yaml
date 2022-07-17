@@ -6,7 +6,6 @@ corresp:
   encoding: "bgr8"
 
 debug_sett:
-  debug_images: false
   debug_matches: false
   debug_markers: false
   debug_distances: false
