@@ -124,11 +124,10 @@ namespace camera_localization {
         void det_and_comp_cbk_general(const sensor_msgs::Image::ConstPtr &msg, const std::string &im_encoding,
                                       const cv::Ptr<cv::Feature2D> &detector, const cv::Mat &mask, cv::Mat &desc,
                                       std::vector<cv::KeyPoint> &kpts, std::mutex &mut);
-
+        cv::Mat m_img_debug_fleft, m_img_debug_fright;
         std::mutex m_mut_pts_left, m_mut_pts_right;
 
         barrier m_barrier{3};
-        std::condition_variable m_cond_fleft, m_cond_fright;
         cv::Mat m_desc_left, m_desc_right;
         std::vector<cv::KeyPoint> m_kpts_left, m_kpts_right;
 

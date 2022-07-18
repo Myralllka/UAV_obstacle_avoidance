@@ -10,14 +10,14 @@ windows:
       layout: tiled
       panes:
         - waitForRos; roslaunch pylon_camera morhunenko.launch
-#  - rqt_imgs:
-#      layout: tiled
-#      panes:
+  - rqt_imgs:
+      layout: tiled
+      panes:
 #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fleft/tag_detections_image
 #        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fright/tag_detections_image
-#        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localization/left_debug
-#        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localization/right_debug
-#        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/basler_stereo_driver/im_corresp
+        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localization/image_left_debug
+        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localization/image_right_debug
+        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localization/im_corresp
   - rviz:
       layout: tiled
       panes:

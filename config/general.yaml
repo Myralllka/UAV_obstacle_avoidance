@@ -11,10 +11,10 @@ debug_sett:
   debug_distances: false
 
 algorithms:
-#  triangulation method can be so-called primitive or svd
+  #  triangulation method can be so-called primitive or svd
   triangulation_method: "svd"
-#  triangulation_method: "primitive"
+  #  triangulation_method: "primitive"
 
-#  triangulation method can be so-called primitive or svd
+  #  triangulation method can be so-called primitive or svd
   detection_method: "ORB"
 #  detection_method: "FAST"

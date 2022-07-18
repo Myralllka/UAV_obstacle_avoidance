@@ -248,6 +248,10 @@ namespace camera_localization {
                                  m_desc_left,
                                  m_kpts_left,
                                  m_mut_pts_left);
+        if (m_debug_distances or m_debug_matches) {
+            std::lock_guard lt{m_mut_pts_left};
+            m_img_debug_fleft = cv_bridge::toCvShare(msg, m_imgs_encoding).get()->image;
+        }
         m_barrier.wait();
     }
 
@@ -259,6 +263,10 @@ namespace camera_localization {
                                  m_desc_right,
                                  m_kpts_right,
                                  m_mut_pts_right);
+        if (m_debug_distances or m_debug_matches) {
+            std::lock_guard lt{m_mut_pts_right};
+            m_img_debug_fright = cv_bridge::toCvShare(msg, m_imgs_encoding).get()->image;
+        }
         m_barrier.wait();
     }
 
@@ -309,19 +317,21 @@ namespace camera_localization {
                        kpts_filtered_1, kpts_filtered_2,
                        kpts_filtered_1_rect, kpts_filtered_2_rect);
 
-//        if (m_debug_matches) {
-//            cv::Mat im_matches;
-//            cv::drawMatches(cv_image_left, keypoints1,
-//                            cv_image_right, keypoints2,
-//                            matches_filtered,
-//                            im_matches,
-//                            cv::Scalar::all(-1), cv::Scalar::all(-1),
-//                            std::vector<char>(),
-//                            cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-//            m_pub_im_corresp.publish(
-//                    cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, im_matches).toImageMsg());
-//            ROS_INFO_THROTTLE(2.0, "[%s & OpenCV]: Correspondences published", NODENAME.c_str());
-//        }
+        if (m_debug_matches) {
+            cv::Mat im_matches;
+            std::lock_guard ll{m_mut_pts_left};
+            std::lock_guard lr{m_mut_pts_right};
+            cv::drawMatches(m_img_debug_fleft, keypoints1,
+                            m_img_debug_fright, keypoints2,
+                            matches_filtered,
+                            im_matches,
+                            cv::Scalar::all(-1), cv::Scalar::all(-1),
+                            std::vector<char>(),
+                            cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+            m_pub_im_corresp.publish(
+                    cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, im_matches).toImageMsg());
+            ROS_INFO_THROTTLE(2.0, "[%s & OpenCV]: Correspondences published", NODENAME.c_str());
+        }
         std::vector<Eigen::Vector3d> res_pts_3d;
         if (m_method_triang == "svd") {
             cv::Mat res_4d_homogenous;
@@ -340,54 +350,60 @@ namespace camera_localization {
             ROS_ERROR("[%s]: unknown triangulation method", NODENAME.c_str());
             ros::shutdown();
         }
-//        std::vector<cv::Scalar> colors;
-//        if (m_debug_markers or m_debug_distances) {
-//            for (size_t i = 0; i < matches.size(); ++i) {
-//                const auto color = generate_random_color();
-//                colors.push_back(color);
-//            }
-//        }
-//        Eigen::Vector3d O{0, 0, 0};
-//        auto markerarr = boost::make_shared<visualization_msgs::MarkerArray>();
-//        if (m_debug_markers) {
-//            int counter = 0;
-//            for (size_t i = 0; i < matches.size(); ++i) {
-//                const auto cv_ray1 = m_camera_left.projectPixelTo3dRay(kpts_filtered_1_rect[i]);
-//                const auto cv_ray2 = m_camera_right.projectPixelTo3dRay(kpts_filtered_2_rect[i]);
-//                const Eigen::Vector3d eigen_vec1{cv_ray1.x, cv_ray1.y, cv_ray1.z};
-//                const Eigen::Vector3d eigen_vec2{cv_ray2.x, cv_ray2.y, cv_ray2.z};
-//
-//                markerarr->markers.emplace_back(create_marker_ray(eigen_vec1, O, m_name_CL, counter++, colors[i]));
-//                markerarr->markers.emplace_back(create_marker_ray(eigen_vec2, O, m_name_CR, counter++, colors[i]));
-//                markerarr->markers.push_back(create_marker_pt(m_name_base, res_pts_3d[i], counter++, colors[i]));
-//            }
-//        }
-//        if (m_debug_distances) {
-//            cv::Mat imright, imleft;
-//            cv_image_right.copyTo(imright);
-//            cv_image_left.copyTo(imleft);
-//            cv::rectangle(imleft, rect_l, cv::Scalar{0, 100, 0}, 2);
-//            cv::rectangle(imright, rect_r, cv::Scalar{0, 100, 0}, 2);
-//            if (m_debug_distances) {
-//                for (size_t i = 0; i < res_pts_3d.size(); ++i) {
-//                    std::ostringstream out;
-//                    out.precision(2);
-//                    out << std::fixed << res_pts_3d[i].norm();
-//                    cv::putText(imleft, out.str(), kpts_filtered_1_rect[i],
-//                                cv::FONT_HERSHEY_PLAIN, 1, colors[i], 2);
-//
-//                    cv::putText(imright, out.str(), kpts_filtered_2_rect[i],
-//                                cv::FONT_HERSHEY_PLAIN, 1, colors[i], 2);
-//                }
-//            }
-//            m_pub_im_left_debug.publish(
-//                    cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imleft).toImageMsg());
-//            m_pub_im_right_debug.publish(
-//                    cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imright).toImageMsg());
-//        }
-//        if (m_debug_markers) {
-//            m_pub_markarray.publish(markerarr);
-//        }
+        std::vector<cv::Scalar> colors;
+        if (m_debug_markers or m_debug_distances) {
+            for (size_t i = 0; i < matches.size(); ++i) {
+                const auto color = generate_random_color();
+                colors.push_back(color);
+            }
+        }
+        Eigen::Vector3d O{0, 0, 0};
+        auto markerarr = boost::make_shared<visualization_msgs::MarkerArray>();
+        if (m_debug_markers) {
+            int counter = 0;
+            for (size_t i = 0; i < matches_filtered.size(); ++i) {
+                const auto pt1_2d = m_camera_left.rectifyPoint(kpts_filtered_1[i]);
+                const auto pt2_2d = m_camera_right.rectifyPoint(kpts_filtered_2[i]);
+                const auto cv_ray1 = m_camera_left.projectPixelTo3dRay(pt1_2d);
+                const auto cv_ray2 = m_camera_right.projectPixelTo3dRay(pt2_2d);
+
+                const Eigen::Vector3d eigen_vec1{cv_ray1.x, cv_ray1.y, cv_ray1.z};
+                const Eigen::Vector3d eigen_vec2{cv_ray2.x, cv_ray2.y, cv_ray2.z};
+
+                markerarr->markers.emplace_back(create_marker_ray(eigen_vec1, O, m_name_CL, counter++, colors[i]));
+                markerarr->markers.emplace_back(create_marker_ray(eigen_vec2, O, m_name_CR, counter++, colors[i]));
+                markerarr->markers.push_back(create_marker_pt(m_name_base, res_pts_3d[i], counter++, colors[i]));
+            }
+        }
+        if (m_debug_distances) {
+            cv::Mat imright, imleft;
+            {
+                std::lock_guard ll{m_mut_pts_left};
+                std::lock_guard lr{m_mut_pts_right};
+                m_img_debug_fleft.copyTo(imleft);
+                m_img_debug_fright.copyTo(imright);
+            }
+            cv::rectangle(imleft, rect_l, cv::Scalar{0, 100, 0}, 2);
+            cv::rectangle(imright, rect_r, cv::Scalar{0, 100, 0}, 2);
+
+            for (size_t i = 0; i < res_pts_3d.size(); ++i) {
+                std::ostringstream out;
+                out.precision(2);
+                out << std::fixed << res_pts_3d[i].norm();
+                cv::putText(imleft, out.str(), kpts_filtered_1[i],
+                            cv::FONT_HERSHEY_PLAIN, 1, colors[i], 2);
+
+                cv::putText(imright, out.str(), kpts_filtered_2[i],
+                            cv::FONT_HERSHEY_PLAIN, 1, colors[i], 2);
+            }
+            m_pub_im_left_debug.publish(
+                    cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imleft).toImageMsg());
+            m_pub_im_right_debug.publish(
+                    cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imright).toImageMsg());
+        }
+        if (m_debug_markers) {
+            m_pub_markarray.publish(markerarr);
+        }
         auto pc_res = boost::make_shared<sensor_msgs::PointCloud2>();
         pts2cloud(res_pts_3d, pc_res, m_name_base);
 //            sensor_msgs::PointCloud2 pc_res;
