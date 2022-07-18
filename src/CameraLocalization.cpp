@@ -98,12 +98,12 @@ namespace camera_localization {
         }
         // | ---------------- subscribers initialize ------------------ |
         m_sub_camfleft = nh.subscribe("/" + m_uav_name + "/basler_left/image_raw",
-                                      8,
+                                      1,
                                       &CameraLocalization::m_cbk_camfleft,
                                       this);
 
         m_sub_camfright = nh.subscribe("/" + m_uav_name + "/basler_right/image_raw",
-                                       8,
+                                       1,
                                        &CameraLocalization::m_cbk_camfright,
                                        this);
 
@@ -230,7 +230,6 @@ namespace camera_localization {
         const auto cv_image = cv_bridge::toCvShare(msg, im_encoding).get()->image;
 
         cv::cvtColor(cv_image, img_gray, cv::COLOR_BGR2GRAY);
-
         detector->detectAndCompute(img_gray,
                                    mask,
                                    kpts_l,
@@ -270,7 +269,6 @@ namespace camera_localization {
         ROS_WARN_THROTTLE(2.0, "[%s]: No new images to search for correspondences", NODENAME.c_str());
         cv::Mat descriptor1, descriptor2;
         std::vector<cv::KeyPoint> keypoints1, keypoints2;
-        auto time = ros::Time::now();
         m_barrier.wait();
         {
             // both mutexes are not available most of the time, so scoped lock

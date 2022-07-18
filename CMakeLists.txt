@@ -49,6 +49,7 @@ include_directories(include
         )
 set(CPU_BASELINE SSE4_2)
 set(CPU_BASELINE AVX2)
+set(WITH_TBB ON)
 set(CMAKE_BUILD_TYPE Release)
 add_library(${FILESNAME} src/${FILESNAME}.cpp src/Utils.cpp include/Utils.h include/barrier.hpp)
 
