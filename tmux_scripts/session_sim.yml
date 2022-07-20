@@ -42,9 +42,9 @@ windows:
   - rviz:
       layout: tiled
       panes:
-        - waitForControl; roslaunch mrs_uav_testing rviz_random_simulation.launch
+        - waitForControl; ./scripts/change_uav.sh ${UAV_NAME}; roslaunch mrs_uav_testing rviz_random_simulation.launch
         - waitForControl; roslaunch mrs_rviz_plugins load_robot.launch
-        # - waitForRos; rviz -d $(rospack find basler_stereopair_driver)/rviz/config.rviz
+        - waitForRos; rviz -d $(rospack find uav_camera_localization)/rviz/simulation.rviz
   - uav_camera_localization:
       layout: even-horizontal
       panes:

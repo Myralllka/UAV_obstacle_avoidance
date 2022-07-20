@@ -6,9 +6,9 @@ corresp:
   encoding: "bgr8"
 
 debug_sett:
-  debug_matches: false
-  debug_markers: false
-  debug_distances: false
+  debug_matches:   true
+  debug_markers:   true 
+  debug_distances: true
 
 algorithms:
   #  triangulation method can be so-called primitive or svd
