@@ -25,7 +25,7 @@
     <arg name="stereopair_base_frame_id" default="$(arg UAV_NAME)/basler_stereopair/base"/>
     <arg name="camera1_fleft_pose" default="/$(arg UAV_NAME)/basler_stereopair/camera1_fleft_pose"/>
     <arg name="camera2_fright_pose" default="/$(arg UAV_NAME)/basler_stereopair/camera2_fright_pose"/>
-    <!-- Namespace - all topics and parameters will be remapped using this namespace as a prefix (eg.: "/vision_example/image_in" to "/uav1/vision_example/image_in") -->
+    <!-- Namespace - all topics and parameters will be remapped using this namespace as a prefix (eg.: "/vision_example/image_in" to "/uavN/vision_example/image_in") -->
     <group ns="$(arg UAV_NAME)">
 
         <!-- ClASS_NAME nodelet -->
@@ -41,8 +41,8 @@
 
             <param name="UAV_NAME" type="string" value="$(arg UAV_NAME)"/>
             <param name="base_frame_pose" type="string" value="$(arg stereopair_base_frame_id)"/>
-            <param name="m_name_CL" type="string" value="uav1/basler_left_optical"/>
-            <param name="m_name_CR" type="string" value="uav1/basler_right_optical"/>
+            <param name="m_name_CL" type="string" value="$(arg UAV_NAME)/basler_left_optical"/>
+            <param name="m_name_CR" type="string" value="$(arg UAV_NAME)/basler_right_optical"/>
             <param name="camera1_fleft_pose" type="string" value="$(arg camera1_fleft_pose)"/>
             <param name="camera2_fright_pose" type="string" value="$(arg camera2_fright_pose)"/>
             <rosparam file="$(find uav_camera_localization)/config/general.yaml"/>

@@ -1,5 +1,7 @@
 name: simulation
 root: ./
+on_project_start: nums=$(shuf -i 1-30 -n 30 | tr '\n' " "); echo "UAV_NUMBERS=($nums)" > /tmp/random_uav_numbers;
+pre_window: source /tmp/random_uav_numbers; export UAV_NAME="uav${UAV_NUMBERS[1]}"; export RUN_TYPE=simulation; export UAV_TYPE=f450; export WORLD_NAME=simulation; export SENSORS="garmin_down"
 startup_window: status
 windows:
   - roscore:
@@ -13,11 +15,9 @@ windows:
   - rqt_imgs:
       layout: tiled
       panes:
-#        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fleft/tag_detections_image
-#        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/fright/tag_detections_image
-        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localization/image_left_debug
-        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localization/image_right_debug
-        - waitForRos; rosrun rqt_image_view rqt_image_view /uav1/camera_localization/im_corresp
+        - waitForRos; rosrun rqt_image_view rqt_image_view /${UAV_NAME}/camera_localization/image_left_debug
+        - waitForRos; rosrun rqt_image_view rqt_image_view /${UAV_NAME}/camera_localization/image_right_debug
+        - waitForRos; rosrun rqt_image_view rqt_image_view /${UAV_NAME}/camera_localization/im_corresp
   - rviz:
       layout: tiled
       panes:
@@ -31,5 +31,5 @@ windows:
       layout: even-horizontal
       panes:
         - waitForRos; roslaunch uav_camera_localization uav_camera_localization.launch
-        - waitForRos; rostopic hz /uav1/basler_left/image_raw
-        - waitForRos; rostopic hz /uav1/camera_localization/tdpts
+        - waitForRos; rostopic hz /${UAV_NAME}/basler_left/image_raw
+        - waitForRos; rostopic hz /${UAV_NAME}/camera_localization/tdpts

@@ -49,5 +49,5 @@ windows:
       layout: even-horizontal
       panes:
         - waitForRos; roslaunch uav_camera_localization uav_camera_localization.launch
-        - waitForRos; rostopic hz /uav1/basler_left/image_raw
-        - waitForRos; rostopic hz /uav1/camera_localization/tdpts
+        - waitForRos; rostopic hz /${UAV_NAME}/basler_left/image_raw
+        - waitForRos; rostopic hz /${UAV_NAME}/camera_localization/tdpts
