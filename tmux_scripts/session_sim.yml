@@ -42,12 +42,12 @@ windows:
   - rviz:
       layout: tiled
       panes:
-        - waitForControl; ./scripts/change_uav.sh ${UAV_NAME}; roslaunch mrs_uav_testing rviz_random_simulation.launch
+        - waitForRos; roscd uav_camera_localization; ./scripts/change_uav.sh ${UAV_NAME}; rviz -d $(rospack find uav_camera_localization)/rviz/simulation.rviz
         - waitForControl; roslaunch mrs_rviz_plugins load_robot.launch
-        - waitForRos; rviz -d $(rospack find uav_camera_localization)/rviz/simulation.rviz
   - uav_camera_localization:
       layout: even-horizontal
       panes:
         - waitForRos; roslaunch uav_camera_localization uav_camera_localization.launch
-        - waitForRos; rostopic hz /${UAV_NAME}/basler_left/image_raw
+        - waitForRos; rostopic hz /${UAV_NAME}/fright/camera/image_raw
+        - waitForRos; rostopic hz /${UAV_NAME}/fleft/camera/image_raw
         - waitForRos; rostopic hz /${UAV_NAME}/camera_localization/tdpts

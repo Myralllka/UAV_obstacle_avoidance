@@ -97,12 +97,12 @@ namespace camera_localization {
             m_pub_im_corresp = nh.advertise<sensor_msgs::Image>("im_corresp", 1);
         }
         // | ---------------- subscribers initialize ------------------ |
-        m_sub_camfleft = nh.subscribe("/" + m_uav_name + "/basler_left/image_raw",
+        m_sub_camfleft = nh.subscribe("/" + m_uav_name + "/fleft/camera/image_raw",
                                       1,
                                       &CameraLocalization::m_cbk_camfleft,
                                       this);
 
-        m_sub_camfright = nh.subscribe("/" + m_uav_name + "/basler_right/image_raw",
+        m_sub_camfright = nh.subscribe("/" + m_uav_name + "/fright/camera/image_raw",
                                        1,
                                        &CameraLocalization::m_cbk_camfright,
                                        this);
@@ -128,10 +128,10 @@ namespace camera_localization {
 
         mrs_lib::construct_object(handler_camleftinfo,
                                   shopt,
-                                  "/" + m_uav_name + "/basler_left/camera_info");
+                                  "/" + m_uav_name + "/fleft/camera/camera_info");
         mrs_lib::construct_object(handler_camrightinfo,
                                   shopt,
-                                  "/" + m_uav_name + "/basler_right/camera_info");
+                                  "/" + m_uav_name + "/fright/camera/camera_info");
         // initialize cameras with pinhole modeller
         while (not(handler_camleftinfo.newMsg() and handler_camrightinfo.newMsg())) {
             ROS_WARN_THROTTLE(1.0, "[%s]: waiting for camera info messages", NODENAME.c_str());

@@ -11,5 +11,5 @@ elif [ -x "$(whereis vim | awk '{print $2}')" ]; then
  HEADLESS=""
 fi
 
-echo "$VIM_BIN -u '$GIT_PATH/linux-setup/submodules/profile_manager/epigen/epigen.vimrc' $HEADLESS -Ens -c '%s/uav[0-9]\+/$1/g' -c 'wqa' -- '$SCRIPT_PATH/../rviz/device.rviz'"
+$VIM_BIN -u "$GIT_PATH/linux-setup/submodules/profile_manager/epigen/epigen.vimrc" $HEADLESS -Ens -c "%s/uav[0-9]\+/$1/g" -c "wqa" -- "$SCRIPT_PATH/../rviz/device.rviz"
 $VIM_BIN -u "$GIT_PATH/linux-setup/submodules/profile_manager/epigen/epigen.vimrc" $HEADLESS -Ens -c "%s/uav[0-9]\+/$1/g" -c "wqa" -- "$SCRIPT_PATH/../rviz/simulation.rviz"

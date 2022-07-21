@@ -28,6 +28,20 @@
     <!-- Namespace - all topics and parameters will be remapped using this namespace as a prefix (eg.: "/vision_example/image_in" to "/uavN/vision_example/image_in") -->
     <group ns="$(arg UAV_NAME)">
 
+        <node pkg="topic_tools" type="relay"
+              args="/$(arg UAV_NAME)/fleft/camera/camera_info  /$(arg UAV_NAME)/basler_left/camera_info"
+              name="fleftin2in"/>
+        <node pkg="topic_tools" type="relay"
+              args="/$(arg UAV_NAME)/fleft/camera/image_raw  /$(arg UAV_NAME)/basler_left/image_raw"
+              name="fleftim2im"/>
+
+        <node pkg="topic_tools" type="relay"
+              args="/$(arg UAV_NAME)/fright/camera/camera_info  /$(arg UAV_NAME)/basler_right/camera_info"
+              name="frightin2in"/>
+        <node pkg="topic_tools" type="relay"
+              args="/$(arg UAV_NAME)/fright/camera/image_raw  /$(arg UAV_NAME)/basler_right/image_raw"
+              name="frightim2im"/>
+
         <!-- ClASS_NAME nodelet -->
         <node pkg="nodelet"
               type="nodelet"
