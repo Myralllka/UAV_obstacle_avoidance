@@ -11,7 +11,7 @@ windows:
   - gazebo:
       layout: tiled
       panes:
-        - waitForRos; roslaunch mrs_simulation simulation.launch world_name:= gui:=true
+        - waitForRos; roslaunch mrs_simulation simulation.launch world_name:=mrs_city gui:=true
         - waitForOdometry; gz camera -c gzclient_camera -f ${UAV_NAME}; history -s gz camera -c gzclient_camera -f ${UAV_NAME}
         - waitFowOdometry; rosrun tf2_ros static_transform_publisher 0 0 0 0 0 0 1 /${UAV_NAME}/fcu /${UAV_NAME}/basler_stereopair/base
   - status:
@@ -51,3 +51,7 @@ windows:
         - waitForRos; rostopic hz /${UAV_NAME}/fright/camera/image_raw
         - waitForRos; rostopic hz /${UAV_NAME}/fleft/camera/image_raw
         - waitForRos; rostopic hz /${UAV_NAME}/camera_localization/tdpts
+  - camera_calibration:
+      layout: even-horizontal
+      panes:
+        - history -s "roslaunch calibration_gazebo landmark.launch"
