@@ -115,7 +115,8 @@ namespace camera_localization {
                                                 const Eigen::Vector3d &pt);
 
     [[maybe_unused]] void
-    pts2cloud(const std::vector<Eigen::Vector3d> &pts, boost::shared_ptr<sensor_msgs::PointCloud2> &res_cloud, const std::string &base);
+    pts2cloud(const std::vector<Eigen::Vector3d> &pts, boost::shared_ptr<sensor_msgs::PointCloud2> &res_cloud,
+              const std::string &base);
 
     [[maybe_unused]] visualization_msgs::Marker
     create_marker_pt(const std::string &base,
@@ -140,6 +141,11 @@ namespace camera_localization {
                                                                  const Eigen::Vector3d &r1,
                                                                  const Eigen::Vector3d &r2);
 
+    [[maybe_unused]] std::pair<std::vector<cv::KeyPoint>, cv::Mat>
+    det_and_desc_general(const sensor_msgs::Image::ConstPtr &msg,
+                         const std::string &im_encoding,
+                         const cv::Mat &mask,
+                         int n_features = 300) const;
 }
 
 

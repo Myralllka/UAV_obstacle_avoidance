@@ -10,10 +10,9 @@ Panels:
         - /Odometry1/odom_main1
         - /Odometry1/odom_main1/Shape1
         - /basler_stereoapir1
-        - /basler_stereoapir1/Status1
         - /Image2
       Splitter Ratio: 0.31008583307266235
-    Tree Height: 560
+    Tree Height: 601
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -93,41 +92,41 @@ Visualization Manager:
           Value: true
         odom_ned:
           Value: true
-        uav4/basler_left:
+        uav12/basler_left:
           Value: true
-        uav4/basler_left_optical:
+        uav12/basler_left_optical:
           Value: true
-        uav4/basler_right_optical:
+        uav12/basler_right_optical:
           Value: true
-        uav4/basler_rigth:
+        uav12/basler_rigth:
           Value: true
-        uav4/basler_stereopair/base:
+        uav12/basler_stereopair/base:
           Value: true
-        uav4/fcu:
+        uav12/fcu:
           Value: true
-        uav4/fcu/arms:
+        uav12/fcu/arms:
           Value: true
-        uav4/fcu/arms_red:
+        uav12/fcu/arms_red:
           Value: true
-        uav4/fcu/props:
+        uav12/fcu/props:
           Value: true
-        uav4/fcu/uav_marker:
+        uav12/fcu/uav_marker:
           Value: true
-        uav4/fcu_untilted:
+        uav12/fcu_untilted:
           Value: true
-        uav4/fixed_map_odom:
+        uav12/fixed_map_odom:
           Value: true
-        uav4/garmin:
+        uav12/garmin:
           Value: true
-        uav4/gps_origin:
+        uav12/gps_origin:
           Value: true
-        uav4/gps_origin_amsl:
+        uav12/gps_origin_amsl:
           Value: true
-        uav4/local_origin:
+        uav12/local_origin:
           Value: true
-        uav4/stable_origin:
+        uav12/stable_origin:
           Value: true
-        uav4/utm_origin:
+        uav12/utm_origin:
           Value: true
       Marker Alpha: 1
       Marker Scale: 1
@@ -136,36 +135,36 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        uav4/fcu:
-          uav4/basler_stereopair/base:
-            uav4/basler_left:
-              uav4/basler_left_optical:
+        uav12/fcu:
+          uav12/basler_stereopair/base:
+            uav12/basler_left:
+              uav12/basler_left_optical:
                 {}
-            uav4/basler_rigth:
-              uav4/basler_right_optical:
+            uav12/basler_rigth:
+              uav12/basler_right_optical:
                 {}
-          uav4/fcu/arms:
+          uav12/fcu/arms:
             {}
-          uav4/fcu/arms_red:
+          uav12/fcu/arms_red:
             {}
-          uav4/fcu/props:
+          uav12/fcu/props:
             {}
-          uav4/fcu/uav_marker:
+          uav12/fcu/uav_marker:
             {}
-          uav4/fcu_untilted:
+          uav12/fcu_untilted:
             {}
-          uav4/fixed_map_odom:
+          uav12/fixed_map_odom:
             {}
-          uav4/garmin:
+          uav12/garmin:
             {}
-          uav4/gps_origin:
-            uav4/gps_origin_amsl:
+          uav12/gps_origin:
+            uav12/gps_origin_amsl:
               {}
-            uav4/utm_origin:
+            uav12/utm_origin:
               {}
-          uav4/local_origin:
+          uav12/local_origin:
             {}
-          uav4/stable_origin:
+          uav12/stable_origin:
             {}
       Update Interval: 0
       Value: true
@@ -179,28 +178,28 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        uav4/fcu:
+        uav12/fcu:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        uav4/fcu/arms:
+        uav12/fcu/arms:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        uav4/fcu/props:
+        uav12/fcu/props:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        uav4/fcu/uav_marker:
+        uav12/fcu/uav_marker:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
       Name: UAVModel
-      Robot Description: /uav4/robot_model
+      Robot Description: /uav12/robot_model
       TF Prefix: ""
       Update Interval: 0
       Value: true
@@ -209,7 +208,7 @@ Visualization Manager:
       Displays:
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /uav4/control_manager/safety_area_markers
+          Marker Topic: /uav12/control_manager/safety_area_markers
           Name: SafetyhArea
           Namespaces:
             "": true
@@ -217,7 +216,7 @@ Visualization Manager:
           Value: true
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /uav4/control_manager/disturbances_markers
+          Marker Topic: /uav12/control_manager/disturbances_markers
           Name: Disturbances
           Namespaces:
             control_manager: true
@@ -225,7 +224,7 @@ Visualization Manager:
           Value: true
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /uav4/control_manager/safety_area_coordinates_markers
+          Marker Topic: /uav12/control_manager/safety_area_coordinates_markers
           Name: SafetyAreaCoordinates
           Namespaces:
             "": true
@@ -263,7 +262,7 @@ Visualization Manager:
             Shaft Length: 1
             Shaft Radius: 0.05000000074505806
             Value: Axes
-          Topic: /uav4/control_manager/cmd_odom
+          Topic: /uav12/control_manager/cmd_odom
           Unreliable: false
           Value: true
         - Class: rviz/Group
@@ -282,12 +281,12 @@ Visualization Manager:
               Shaft Length: 0.23000000417232513
               Shaft Radius: 0.009999999776482582
               Shape: Arrow (Flat)
-              Topic: /uav4/control_manager/trajectory_original/poses
+              Topic: /uav12/control_manager/trajectory_original/poses
               Unreliable: false
               Value: true
             - Class: rviz/MarkerArray
               Enabled: true
-              Marker Topic: /uav4/control_manager/trajectory_original/markers
+              Marker Topic: /uav12/control_manager/trajectory_original/markers
               Name: Markers
               Namespaces:
                 {}
@@ -309,7 +308,7 @@ Visualization Manager:
           Queue Size: 10
           Show sectors with no data: false
           Show undetected obstacles: true
-          Topic: /uav4/bumper/obstacle_sectors
+          Topic: /uav12/bumper/obstacle_sectors
           Unreliable: false
           Value: true
           Vertical collision threshold: 1
@@ -349,7 +348,7 @@ Visualization Manager:
             Shaft Length: 1
             Shaft Radius: 0.05000000074505806
             Value: Arrow
-          Topic: /uav4/control_manager/cmd_odom
+          Topic: /uav12/control_manager/cmd_odom
           Unreliable: true
           Value: false
         - Angle Tolerance: 0.009999999776482582
@@ -384,7 +383,7 @@ Visualization Manager:
             Shaft Length: 1
             Shaft Radius: 0.05000000074505806
             Value: Arrow
-          Topic: /uav4/odometry/odom_main
+          Topic: /uav12/odometry/odom_main
           Unreliable: true
           Value: true
       Enabled: true
@@ -393,7 +392,7 @@ Visualization Manager:
       Displays:
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /uav4/trajectory_generation/markers/final
+          Marker Topic: /uav12/trajectory_generation/markers/final
           Name: final
           Namespaces:
             {}
@@ -401,7 +400,7 @@ Visualization Manager:
           Value: true
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /uav4/trajectory_generation/markers/original
+          Marker Topic: /uav12/trajectory_generation/markers/original
           Name: original
           Namespaces:
             {}
@@ -412,8 +411,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 1.57858407497406
-        Min Value: 1.456400752067566
+        Max Value: 1.9819767475128174
+        Min Value: 1.9819767475128174
         Value: true
       Axis: Z
       Channel Name: intensity
@@ -432,14 +431,14 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.10000000149011612
       Style: Flat Squares
-      Topic: /uav4/camera_localization/tdpts
+      Topic: /uav12/camera_localization/tdpts
       Unreliable: true
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /uav4/camera_localization/im_corresp
+      Image Topic: /uav12/camera_localization/im_corresp
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -452,7 +451,7 @@ Visualization Manager:
     - Class: rviz/Camera
       Enabled: false
       Image Rendering: background and overlay
-      Image Topic: /uav4/basler_left/image_raw
+      Image Topic: /uav12/basler_left/image_raw
       Name: left
       Overlay Alpha: 0.5
       Queue Size: 2
@@ -491,7 +490,7 @@ Visualization Manager:
     - Class: rviz/Camera
       Enabled: false
       Image Rendering: background and overlay
-      Image Topic: /uav4/basler_right/image_raw
+      Image Topic: /uav12/basler_right/image_raw
       Name: right
       Overlay Alpha: 0.5
       Queue Size: 2
@@ -519,9 +518,8 @@ Visualization Manager:
           position_cmd: true
         TF: true
         TrajectoryGeneration:
+          "": true
           Value: true
-          final: true
-          original: true
         UAVModel: true
         Value: true
         basler_stereoapir: true
@@ -530,7 +528,7 @@ Visualization Manager:
       Zoom Factor: 1
     - Class: rviz/MarkerArray
       Enabled: true
-      Marker Topic: /uav4/camera_localization/markerarray
+      Marker Topic: /uav12/camera_localization/markerarray
       Name: MarkerArray
       Namespaces:
         points: true
@@ -538,8 +536,8 @@ Visualization Manager:
       Queue Size: 100
       Value: true
     - Class: rviz/Image
-      Enabled: false
-      Image Topic: /uav4/camera_localization/image_left_debug
+      Enabled: true
+      Image Topic: /uav12/camera_localization/image_left_debug
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -548,10 +546,10 @@ Visualization Manager:
       Queue Size: 2
       Transport Hint: raw
       Unreliable: false
-      Value: false
+      Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /uav4/camera_localization/image_right_debug
+      Image Topic: /uav12/camera_localization/image_right_debug
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -565,7 +563,7 @@ Visualization Manager:
   Global Options:
     Background Color: 100; 100; 100
     Default Light: true
-    Fixed Frame: uav4/local_origin
+    Fixed Frame: uav12/local_origin
     Frame Rate: 30
   Name: root
   Tools:
@@ -605,19 +603,19 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.0797970294952393
-      Target Frame: uav4/fcu
-      Yaw: 1.9772238731384277
+      Pitch: 0.1397971212863922
+      Target Frame: uav12/fcu
+      Yaw: 0.8522243499755859
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1024
+  Height: 1080
   Hide Left Dock: false
   Hide Right Dock: false
   Image:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd000000040000000000000230000003aafc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000004c60000022a000001a900000153fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afc0000003b000002b1000000c700fffffffa000000010100000002fb0000000a0049006d0061006700650000000000ffffffff0000005a00fffffffb000000100044006900730070006c0061007900730100000000000002300000015600fffffffb0000000e006d00610074006300680065007301000002f2000000f30000001600fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000e006d006100740063006800650073000000031a000000cb00000000000000000000000100000381000003aafc0200000006fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fc0000003b000001020000000000fffffffaffffffff0100000002fb00000008006c0065006600740000000000ffffffff0000004700fffffffb0000000a00560069006500770073000000065e000001160000010000fffffffb0000000a00720069006700680074000000003b000001450000001600fffffffb0000000a0049006d006100670065010000003b000003aa0000001600fffffffb0000000a0049006d0061006700650100000213000001d20000000000000000fb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000038f0000003efc0100000002fb0000000800540069006d006500000000000000038f0000042200fffffffb0000000800540069006d00650100000000000004500000000000000000000001b7000003aa00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd000000040000000000000156000003e2fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000004c60000022a000001a900000153fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003b000002da000000c700fffffffb0000000e006d006100740063006800650073010000031b000001020000001600fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000e006d006100740063006800650073000000031a000000cb00000000000000000000000100000275000003e2fc0200000007fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fc0000003b000001020000000000fffffffaffffffff0100000002fb00000008006c0065006600740000000000ffffffff0000004700fffffffb0000000a00560069006500770073000000065e000001160000010000fffffffb0000000a00720069006700680074000000003b000001450000001600fffffffb0000000a0049006d006100670065010000003b000001ee0000001600fffffffb0000000a0049006d006100670065010000022f000001ee0000001600fffffffb0000000a0049006d0061006700650100000213000001d20000000000000000fb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000038f0000003efc0100000002fb0000000800540069006d006500000000000000038f0000042200fffffffb0000000800540069006d00650100000000000004500000000000000000000003a9000003e200000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -626,9 +624,9 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: false
-  Width: 1908
-  X: 1085
-  Y: 27
+  Width: 1920
+  X: 1080
+  Y: 0
   left:
     collapsed: false
   matches:

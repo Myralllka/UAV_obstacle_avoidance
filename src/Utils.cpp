@@ -99,6 +99,26 @@ namespace camera_localization {
         return res;
     }
 
+    [[maybe_unused]] std::pair<std::vector<cv::KeyPoint>, cv::Mat>
+    det_and_desc_general(const sensor_msgs::Image::ConstPtr &msg,
+                         const std::string &im_encoding,
+                         const cv::Mat &mask,
+                         int n_features = 300) const {
+        cv::Mat desc_l, img_gray;
+        std::vector<cv::KeyPoint> kpts_l;
+        const auto cv_image = cv_bridge::toCvShare(msg, im_encoding).get()->image;
+
+        cv::cvtColor(cv_image, img_gray, cv::COLOR_BGR2GRAY);
+
+        auto detector = cv::ORB::create(n_features);
+        detector->detectAndCompute(img_gray,
+                                   mask,
+                                   kpts_l,
+                                   desc_l);
+
+        return {std::move(kpts_l), std::move(desc_l)};
+    }
+
     [[maybe_unused]] visualization_msgs::Marker create_marker_ray(const Eigen::Vector3d &pt,
                                                                   const Eigen::Vector3d &O,
                                                                   const std::string &cam_name,

@@ -47,8 +47,7 @@ namespace camera_localization {
         pl.loadParam("corresp/distances_ratio", m_distance_ratio);
 
         // detector initialization
-        int n_features;
-        pl.loadParam("corresp/n_features", n_features);
+        pl.loadParam("corresp/n_features", m_n_features);
 
         // load algorithms
         pl.loadParam("algorithms/triangulation_method", m_method_triang);
@@ -60,8 +59,6 @@ namespace camera_localization {
             ROS_INFO_ONCE("[%s]: loaded parameters", NODENAME.c_str());
         }
         // | ---------------- some data post-processing --------------- |
-        detector_left = cv::ORB::create(n_features);
-        detector_right = cv::ORB::create(n_features);
 
         // initiate masks for an image matching part
         rect_l = cv::Rect{lroi[0], lroi[1], lroi[2], lroi[3]};
@@ -218,51 +215,26 @@ namespace camera_localization {
     }
 
 // | ---------------------- msg callbacks --------------------- |
-    void CameraLocalization::det_and_comp_cbk_general(const sensor_msgs::Image::ConstPtr &msg,
-                                                      const std::string &im_encoding,
-                                                      const cv::Ptr<cv::Feature2D> &detector,
-                                                      const cv::Mat &mask,
-                                                      cv::Mat &desc,
-                                                      std::vector<cv::KeyPoint> &kpts,
-                                                      std::mutex &mut) {
-        cv::Mat desc_l, img_gray;
-        std::vector<cv::KeyPoint> kpts_l;
-        const auto cv_image = cv_bridge::toCvShare(msg, im_encoding).get()->image;
-
-        cv::cvtColor(cv_image, img_gray, cv::COLOR_BGR2GRAY);
-        detector->detectAndCompute(img_gray,
-                                   mask,
-                                   kpts_l,
-                                   desc_l);
-
-        std::lock_guard lt{mut};
-        desc = desc_l;
-        kpts = kpts_l;
-    }
 
     void CameraLocalization::m_cbk_camfleft(const sensor_msgs::Image::ConstPtr &msg) {
-        det_and_comp_cbk_general(msg,
-                                 m_imgs_encoding,
-                                 detector_left,
-                                 m_mask_left,
-                                 m_desc_left,
-                                 m_kpts_left,
-                                 m_mut_pts_left);
+        const auto[kpts, desc] = det_and_desc_general(msg,
+                                                      m_imgs_encoding,
+                                                      m_mask_left,
+                                                      m_n_features);
         if (m_debug_distances or m_debug_matches) {
             std::lock_guard lt{m_mut_pts_left};
             m_img_debug_fleft = cv_bridge::toCvShare(msg, m_imgs_encoding).get()->image;
+        }
+        {
+            std::lock_guard lt(m_mut_pts_right);
         }
         m_barrier.wait();
     }
 
     void CameraLocalization::m_cbk_camfright(const sensor_msgs::Image::ConstPtr &msg) {
-        det_and_comp_cbk_general(msg,
-                                 m_imgs_encoding,
-                                 detector_right,
-                                 m_mask_right,
-                                 m_desc_right,
-                                 m_kpts_right,
-                                 m_mut_pts_right);
+        det_and_desc_general(msg,
+                             m_imgs_encoding,
+                             m_mask_right);
         if (m_debug_distances or m_debug_matches) {
             std::lock_guard lt{m_mut_pts_right};
             m_img_debug_fright = cv_bridge::toCvShare(msg, m_imgs_encoding).get()->image;
@@ -275,7 +247,7 @@ namespace camera_localization {
     void CameraLocalization::m_tim_cbk_corresp([[maybe_unused]] const ros::TimerEvent &ev) {
         if (not m_is_initialized) return;
         ROS_WARN_THROTTLE(2.0, "[%s]: No new images to search for correspondences", NODENAME.c_str());
-        cv::Mat descriptor1, descriptor2;
+        cv::Mat descriptor1, descriptor2, imright, imleft;
         std::vector<cv::KeyPoint> keypoints1, keypoints2;
         m_barrier.wait();
         {
@@ -289,6 +261,10 @@ namespace camera_localization {
             descriptor2 = m_desc_right;
             keypoints1 = m_kpts_left;
             keypoints2 = m_kpts_right;
+            if (m_debug_distances or m_debug_matches or m_debug_markers) {
+                m_img_debug_fleft.copyTo(imleft);
+                m_img_debug_fright.copyTo(imright);
+            }
         }
 
         if ((keypoints1.size() < 10) or (keypoints2.size() < 10)) {
@@ -319,8 +295,6 @@ namespace camera_localization {
 
         if (m_debug_matches) {
             cv::Mat im_matches;
-            std::lock_guard ll{m_mut_pts_left};
-            std::lock_guard lr{m_mut_pts_right};
             cv::drawMatches(m_img_debug_fleft, keypoints1,
                             m_img_debug_fright, keypoints2,
                             matches_filtered,
@@ -375,14 +349,8 @@ namespace camera_localization {
                 markerarr->markers.push_back(create_marker_pt(m_name_base, res_pts_3d[i], counter++, colors[i]));
             }
         }
+
         if (m_debug_distances) {
-            cv::Mat imright, imleft;
-            {
-                std::lock_guard ll{m_mut_pts_left};
-                std::lock_guard lr{m_mut_pts_right};
-                m_img_debug_fleft.copyTo(imleft);
-                m_img_debug_fright.copyTo(imright);
-            }
             cv::rectangle(imleft, rect_l, cv::Scalar{0, 100, 0}, 2);
             cv::rectangle(imright, rect_r, cv::Scalar{0, 100, 0}, 2);
 
@@ -401,9 +369,11 @@ namespace camera_localization {
             m_pub_im_right_debug.publish(
                     cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imright).toImageMsg());
         }
+
         if (m_debug_markers) {
             m_pub_markarray.publish(markerarr);
         }
+
         auto pc_res = boost::make_shared<sensor_msgs::PointCloud2>();
         pts2cloud(res_pts_3d, pc_res, m_name_base);
 //            sensor_msgs::PointCloud2 pc_res;

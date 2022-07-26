@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <vector>
 #include <random>
+#include <utility>
 
 /* custom helper functions from our library */
 #include <mrs_lib/param_loader.h>
@@ -81,8 +82,7 @@ namespace camera_localization {
 
         // | --------------------- Detectors -------------------- |
         cv::Ptr<cv::BFMatcher> matcher = cv::BFMatcher::create(cv::NORM_HAMMING, true);
-        cv::Ptr<cv::Feature2D> detector_left;
-        cv::Ptr<cv::Feature2D> detector_right;
+        int m_n_features;
         Eigen::Matrix<double, 3, 3> m_K_CL_eig, m_K_CR_eig;
         cv::Matx33d m_K_CL_cv, m_K_CR_cv;
         float m_distance_ratio;
@@ -121,9 +121,6 @@ namespace camera_localization {
         ros::Subscriber m_sub_camfright;
 
         // | ------------------- detection modules -------------------- |
-        void det_and_comp_cbk_general(const sensor_msgs::Image::ConstPtr &msg, const std::string &im_encoding,
-                                      const cv::Ptr<cv::Feature2D> &detector, const cv::Mat &mask, cv::Mat &desc,
-                                      std::vector<cv::KeyPoint> &kpts, std::mutex &mut);
         cv::Mat m_img_debug_fleft, m_img_debug_fright;
         std::mutex m_mut_pts_left, m_mut_pts_right;
 
