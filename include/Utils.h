@@ -145,7 +145,7 @@ namespace camera_localization {
     det_and_desc_general(const sensor_msgs::Image::ConstPtr &msg,
                          const std::string &im_encoding,
                          const cv::Mat &mask,
-                         int n_features = 300) const;
+                         int n_features = 300);
 }
 
 

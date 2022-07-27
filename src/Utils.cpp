@@ -103,7 +103,8 @@ namespace camera_localization {
     det_and_desc_general(const sensor_msgs::Image::ConstPtr &msg,
                          const std::string &im_encoding,
                          const cv::Mat &mask,
-                         int n_features = 300) const {
+                         int n_features) {
+
         cv::Mat desc_l, img_gray;
         std::vector<cv::KeyPoint> kpts_l;
         const auto cv_image = cv_bridge::toCvShare(msg, im_encoding).get()->image;

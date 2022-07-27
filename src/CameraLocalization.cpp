@@ -94,15 +94,20 @@ namespace camera_localization {
             m_pub_im_corresp = nh.advertise<sensor_msgs::Image>("im_corresp", 1);
         }
         // | ---------------- subscribers initialize ------------------ |
-        m_sub_camfleft = nh.subscribe("/" + m_uav_name + "/fleft/camera/image_raw",
-                                      1,
-                                      &CameraLocalization::m_cbk_camfleft,
-                                      this);
+//        m_sub_camfleft = nh.subscribe("/" + m_uav_name + "/fleft/camera/image_raw",
+//                                      1,
+//                                      &CameraLocalization::m_cbk_camfleft,
+//                                      this);
+//
+//        m_sub_camfright = nh.subscribe("/" + m_uav_name + "/fright/camera/image_raw",
+//                                       1,
+//                                       &CameraLocalization::m_cbk_camfright,
+//                                       this);
 
-        m_sub_camfright = nh.subscribe("/" + m_uav_name + "/fright/camera/image_raw",
-                                       1,
-                                       &CameraLocalization::m_cbk_camfright,
-                                       this);
+        m_sub_camfleft.subscribe(nh, "/" + m_uav_name + "/fleft/camera/image_raw", 1);
+        m_sub_camfright.subscribe(nh, "/" + m_uav_name + "/fright/camera/image_raw", 1);
+        m_time_sync.connectInput(m_sub_camfleft, m_sub_camfright);
+        m_time_sync.registerCallback(boost::bind(&CameraLocalization::m_cbk_images, this, _1, _2));
 
         // | --------------------- tf transformer --------------------- |
         m_transformer = mrs_lib::Transformer("CameraLocalization");
@@ -216,31 +221,43 @@ namespace camera_localization {
 
 // | ---------------------- msg callbacks --------------------- |
 
-    void CameraLocalization::m_cbk_camfleft(const sensor_msgs::Image::ConstPtr &msg) {
-        const auto[kpts, desc] = det_and_desc_general(msg,
-                                                      m_imgs_encoding,
-                                                      m_mask_left,
-                                                      m_n_features);
-        if (m_debug_distances or m_debug_matches) {
-            std::lock_guard lt{m_mut_pts_left};
-            m_img_debug_fleft = cv_bridge::toCvShare(msg, m_imgs_encoding).get()->image;
+    void CameraLocalization::m_cbk_images(const sensor_msgs::ImageConstPtr &msg_left,
+                                          const sensor_msgs::ImageConstPtr &msg_right) {
+        std::vector<sensor_msgs::ImageConstPtr> msgs{msg_left, msg_right};
+
+        const auto encode = m_imgs_encoding;
+        const auto fnum = m_n_features;
+        auto masks = std::vector<cv::Mat>{m_mask_left, m_mask_right};
+        std::vector<std::vector<cv::KeyPoint>> kptss;
+        std::vector<cv::Mat> descs;
+        kptss.reserve(2);
+        descs.reserve(2);
+#pragma omp parallel for default(none) shared(msgs, m_n_features, m_imgs_encoding, masks, kptss, descs)
+        for (int i = 0; i < 2; ++i) {
+            auto[kpts, desc] = det_and_desc_general(msgs[i], m_imgs_encoding, masks[i], m_n_features);
+            kptss.push_back(std::move(kpts));
+            descs.push_back(std::move(desc));
         }
-        {
-            std::lock_guard lt(m_mut_pts_right);
-        }
-        m_barrier.wait();
+
     }
 
-    void CameraLocalization::m_cbk_camfright(const sensor_msgs::Image::ConstPtr &msg) {
-        det_and_desc_general(msg,
-                             m_imgs_encoding,
-                             m_mask_right);
-        if (m_debug_distances or m_debug_matches) {
-            std::lock_guard lt{m_mut_pts_right};
-            m_img_debug_fright = cv_bridge::toCvShare(msg, m_imgs_encoding).get()->image;
-        }
-        m_barrier.wait();
-    }
+//    void CameraLocalization::m_cbk_camfleft(const sensor_msgs::Image::ConstPtr &msg) {
+//        const auto[kpts, desc] = det_and_desc_general(msg,
+//                                                      m_imgs_encoding,
+//                                                      m_mask_left,
+//                                                      m_n_features);
+//        if (m_debug_distances or m_debug_matches) {
+//            std::lock_guard lt{m_mut_pts_left};
+//            m_img_debug_fleft = cv_bridge::toCvShare(msg, m_imgs_encoding).get()->image;
+//        }
+//        {
+//            std::lock_guard lt(m_mut_pts_right);
+//        }
+//        m_barrier.wait();
+//    }
+//
+//    void CameraLocalization::m_cbk_camfright(const sensor_msgs::Image::ConstPtr &msg) {
+//    }
 
 // | --------------------- timer callbacks -------------------- |
 

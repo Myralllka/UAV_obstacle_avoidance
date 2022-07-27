@@ -6,6 +6,9 @@
 #include <ros/package.h>
 #include <nodelet/nodelet.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
+
 /* some STL includes */
 #include <cstdlib>
 #include <cstdio>
@@ -20,6 +23,7 @@
 #include <mrs_lib/geometry/conversions.h>
 
 /* other important includes */
+#include <boost/bind.hpp>
 #include <nav_msgs/Odometry.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <apriltag_ros/AprilTagDetectionArray.h>
@@ -98,12 +102,14 @@ namespace camera_localization {
         mrs_lib::Transformer m_transformer;
 
         // | ---------------------- msg callbacks --------------------- |
-        void m_cbk_camfleft(const sensor_msgs::Image::ConstPtr &msg);
+//        void m_cbk_camfleft(const sensor_msgs::ImageConstPtr &msg);
+//
+//        void m_cbk_camfright(const sensor_msgs::ImageConstPtr &msg);
 
-        void m_cbk_camfright(const sensor_msgs::Image::ConstPtr &msg);
+        void m_cbk_images(const sensor_msgs::ImageConstPtr &msg_left,
+                          const sensor_msgs::ImageConstPtr &msg_right);
 
         // | --------------------- timer callbacks -------------------- |
-
         ros::Timer m_tim_corresp;
 
         [[maybe_unused]] void m_tim_cbk_corresp([[maybe_unused]] const ros::TimerEvent &ev);
@@ -117,14 +123,18 @@ namespace camera_localization {
         ros::Publisher m_pub_pcld;
 
         // | ----------------------- subscribers ---------------------- |
-        ros::Subscriber m_sub_camfleft;
-        ros::Subscriber m_sub_camfright;
+        message_filters::Subscriber<sensor_msgs::Image> m_sub_camfleft;
+        message_filters::Subscriber<sensor_msgs::Image> m_sub_camfright;
+        message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::Image> m_time_sync;
+
+//        ros::Subscriber m_sub_camfleft;
+//        ros::Subscriber m_sub_camfright;
 
         // | ------------------- detection modules -------------------- |
         cv::Mat m_img_debug_fleft, m_img_debug_fright;
         std::mutex m_mut_pts_left, m_mut_pts_right;
 
-        barrier m_barrier{3};
+        barrier m_barrier{2};
         cv::Mat m_desc_left, m_desc_right;
         std::vector<cv::KeyPoint> m_kpts_left, m_kpts_right;
 
@@ -144,9 +154,11 @@ namespace camera_localization {
                                                                             const std::vector<cv::Point2d> &kpts2);
 
         [[maybe_unused]] void
-        filter_matches(const std::vector<cv::DMatch> &input_matches, const std::vector<cv::KeyPoint> &kpts1,
-                       const std::vector<cv::KeyPoint> &kpts2, const cv::Point2d &o1_2d,
-                       const cv::Point2d &o2_2d, std::vector<cv::DMatch> &res_matches,
+        filter_matches(const std::vector<cv::DMatch> &input_matches,
+                       const std::vector<cv::KeyPoint> &kpts1,
+                       const std::vector<cv::KeyPoint> &kpts2,
+                       const cv::Point2d &o1_2d, const cv::Point2d &o2_2d,
+                       std::vector<cv::DMatch> &res_matches,
                        std::vector<cv::Point2d> &res_kpts1, std::vector<cv::Point2d> &res_kpts2,
                        std::vector<cv::Point2d> &res_kpts1_rect, std::vector<cv::Point2d> &res_kpts2_rect);
 
