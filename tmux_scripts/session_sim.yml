@@ -11,7 +11,7 @@ windows:
   - gazebo:
       layout: tiled
       panes:
-        - waitForRos; roslaunch mrs_simulation simulation.launch world_name:=mrs_city gui:=true
+        - waitForRos; roslaunch mrs_simulation simulation.launch world_name:=mrs_city gui:=false
         - waitForOdometry; gz camera -c gzclient_camera -f ${UAV_NAME}; history -s gz camera -c gzclient_camera -f ${UAV_NAME}
         - waitFowOdometry; rosrun tf2_ros static_transform_publisher 0 0 0 0 0 0 1 /${UAV_NAME}/fcu /${UAV_NAME}/basler_stereopair/base
   - status:

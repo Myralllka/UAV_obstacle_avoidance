@@ -7,7 +7,8 @@
 #include <nodelet/nodelet.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <message_filters/subscriber.h>
-#include <message_filters/time_synchronizer.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
 
 /* some STL includes */
 #include <cstdlib>
@@ -125,7 +126,9 @@ namespace camera_localization {
         // | ----------------------- subscribers ---------------------- |
         message_filters::Subscriber<sensor_msgs::Image> m_sub_camfleft;
         message_filters::Subscriber<sensor_msgs::Image> m_sub_camfright;
-        message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::Image> m_time_sync;
+//        using approx_time_sync_images_t = message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::Image>;
+        using approx_time_sync_images_t = message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image>;
+        boost::shared_ptr<message_filters::Synchronizer<approx_time_sync_images_t>> m_time_sync;
 
 //        ros::Subscriber m_sub_camfleft;
 //        ros::Subscriber m_sub_camfright;

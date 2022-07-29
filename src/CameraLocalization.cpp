@@ -106,8 +106,13 @@ namespace camera_localization {
 
         m_sub_camfleft.subscribe(nh, "/" + m_uav_name + "/fleft/camera/image_raw", 1);
         m_sub_camfright.subscribe(nh, "/" + m_uav_name + "/fright/camera/image_raw", 1);
-        m_time_sync.connectInput(m_sub_camfleft, m_sub_camfright);
-        m_time_sync.registerCallback(boost::bind(&CameraLocalization::m_cbk_images, this, _1, _2));
+//        m_time_sync.connectInput(m_sub_camfleft, m_sub_camfright);
+//        m_time_sync.registerCallback(boost::bind(&CameraLocalization::m_cbk_images, this, _1, _2));
+        m_time_sync = boost::make_shared<message_filters::Synchronizer<approx_time_sync_images_t>>(
+                approx_time_sync_images_t(4),
+                m_sub_camfleft,
+                m_sub_camfright);
+        m_time_sync->registerCallback(&CameraLocalization::m_cbk_images, this);
 
         // | --------------------- tf transformer --------------------- |
         m_transformer = mrs_lib::Transformer("CameraLocalization");
@@ -223,41 +228,33 @@ namespace camera_localization {
 
     void CameraLocalization::m_cbk_images(const sensor_msgs::ImageConstPtr &msg_left,
                                           const sensor_msgs::ImageConstPtr &msg_right) {
-        std::vector<sensor_msgs::ImageConstPtr> msgs{msg_left, msg_right};
-
         const auto encode = m_imgs_encoding;
         const auto fnum = m_n_features;
-        auto masks = std::vector<cv::Mat>{m_mask_left, m_mask_right};
-        std::vector<std::vector<cv::KeyPoint>> kptss;
-        std::vector<cv::Mat> descs;
-        kptss.reserve(2);
-        descs.reserve(2);
-#pragma omp parallel for default(none) shared(msgs, m_n_features, m_imgs_encoding, masks, kptss, descs)
+        std::vector<cv::Mat> masks{m_mask_left, m_mask_right};
+        std::vector<sensor_msgs::ImageConstPtr> msgs{msg_left, msg_right};
+        std::vector<cv::Mat> descs{2};
+        std::vector<std::vector<cv::KeyPoint>> kptss{2};
+//#pragma omp parallel for default(none) shared(msgs, masks, kptss, descs) firstprivate(fnum, encode)
         for (int i = 0; i < 2; ++i) {
-            auto[kpts, desc] = det_and_desc_general(msgs[i], m_imgs_encoding, masks[i], m_n_features);
-            kptss.push_back(std::move(kpts));
-            descs.push_back(std::move(desc));
+            auto[kpts, desc] = det_and_desc_general(msgs[i], encode, masks[i], fnum);
+            kptss[i] = (std::move(kpts));
+            descs[i] = (std::move(desc));
         }
-
+        {
+//            std::scoped_lock lt{m_mut_pts_right, m_mut_pts_left};
+            std::lock_guard l1{m_mut_pts_left};
+            std::lock_guard l2{m_mut_pts_right};
+            m_kpts_left = std::move(kptss[0]);
+            m_kpts_right = std::move(kptss[1]);
+            m_desc_left = std::move(descs[0]);
+            m_desc_right = std::move(descs[1]);
+            if (m_debug_markers or m_debug_distances or m_debug_matches) {
+                m_img_debug_fleft = cv_bridge::toCvShare(msg_left, m_imgs_encoding).get()->image;
+                m_img_debug_fright = cv_bridge::toCvShare(msg_right, m_imgs_encoding).get()->image;
+            }
+        }
+        m_barrier.wait();
     }
-
-//    void CameraLocalization::m_cbk_camfleft(const sensor_msgs::Image::ConstPtr &msg) {
-//        const auto[kpts, desc] = det_and_desc_general(msg,
-//                                                      m_imgs_encoding,
-//                                                      m_mask_left,
-//                                                      m_n_features);
-//        if (m_debug_distances or m_debug_matches) {
-//            std::lock_guard lt{m_mut_pts_left};
-//            m_img_debug_fleft = cv_bridge::toCvShare(msg, m_imgs_encoding).get()->image;
-//        }
-//        {
-//            std::lock_guard lt(m_mut_pts_right);
-//        }
-//        m_barrier.wait();
-//    }
-//
-//    void CameraLocalization::m_cbk_camfright(const sensor_msgs::Image::ConstPtr &msg) {
-//    }
 
 // | --------------------- timer callbacks -------------------- |
 
@@ -274,6 +271,7 @@ namespace camera_localization {
             // because both mutexes are accessed from different threads.
             std::lock_guard l1{m_mut_pts_left};
             std::lock_guard l2{m_mut_pts_right};
+//            std::scoped_lock lt{m_mut_pts_left, m_mut_pts_right};
             descriptor1 = m_desc_left;
             descriptor2 = m_desc_right;
             keypoints1 = m_kpts_left;

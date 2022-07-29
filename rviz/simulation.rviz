@@ -92,41 +92,41 @@ Visualization Manager:
           Value: true
         odom_ned:
           Value: true
-        uav12/basler_left:
+        uav8/basler_left:
           Value: true
-        uav12/basler_left_optical:
+        uav8/basler_left_optical:
           Value: true
-        uav12/basler_right_optical:
+        uav8/basler_right_optical:
           Value: true
-        uav12/basler_rigth:
+        uav8/basler_rigth:
           Value: true
-        uav12/basler_stereopair/base:
+        uav8/basler_stereopair/base:
           Value: true
-        uav12/fcu:
+        uav8/fcu:
           Value: true
-        uav12/fcu/arms:
+        uav8/fcu/arms:
           Value: true
-        uav12/fcu/arms_red:
+        uav8/fcu/arms_red:
           Value: true
-        uav12/fcu/props:
+        uav8/fcu/props:
           Value: true
-        uav12/fcu/uav_marker:
+        uav8/fcu/uav_marker:
           Value: true
-        uav12/fcu_untilted:
+        uav8/fcu_untilted:
           Value: true
-        uav12/fixed_map_odom:
+        uav8/fixed_map_odom:
           Value: true
-        uav12/garmin:
+        uav8/garmin:
           Value: true
-        uav12/gps_origin:
+        uav8/gps_origin:
           Value: true
-        uav12/gps_origin_amsl:
+        uav8/gps_origin_amsl:
           Value: true
-        uav12/local_origin:
+        uav8/local_origin:
           Value: true
-        uav12/stable_origin:
+        uav8/stable_origin:
           Value: true
-        uav12/utm_origin:
+        uav8/utm_origin:
           Value: true
       Marker Alpha: 1
       Marker Scale: 1
@@ -135,36 +135,36 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        uav12/fcu:
-          uav12/basler_stereopair/base:
-            uav12/basler_left:
-              uav12/basler_left_optical:
+        uav8/fcu:
+          uav8/basler_stereopair/base:
+            uav8/basler_left:
+              uav8/basler_left_optical:
                 {}
-            uav12/basler_rigth:
-              uav12/basler_right_optical:
+            uav8/basler_rigth:
+              uav8/basler_right_optical:
                 {}
-          uav12/fcu/arms:
+          uav8/fcu/arms:
             {}
-          uav12/fcu/arms_red:
+          uav8/fcu/arms_red:
             {}
-          uav12/fcu/props:
+          uav8/fcu/props:
             {}
-          uav12/fcu/uav_marker:
+          uav8/fcu/uav_marker:
             {}
-          uav12/fcu_untilted:
+          uav8/fcu_untilted:
             {}
-          uav12/fixed_map_odom:
+          uav8/fixed_map_odom:
             {}
-          uav12/garmin:
+          uav8/garmin:
             {}
-          uav12/gps_origin:
-            uav12/gps_origin_amsl:
+          uav8/gps_origin:
+            uav8/gps_origin_amsl:
               {}
-            uav12/utm_origin:
+            uav8/utm_origin:
               {}
-          uav12/local_origin:
+          uav8/local_origin:
             {}
-          uav12/stable_origin:
+          uav8/stable_origin:
             {}
       Update Interval: 0
       Value: true
@@ -178,28 +178,28 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        uav12/fcu:
+        uav8/fcu:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        uav12/fcu/arms:
+        uav8/fcu/arms:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        uav12/fcu/props:
+        uav8/fcu/props:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        uav12/fcu/uav_marker:
+        uav8/fcu/uav_marker:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
       Name: UAVModel
-      Robot Description: /uav12/robot_model
+      Robot Description: /uav8/robot_model
       TF Prefix: ""
       Update Interval: 0
       Value: true
@@ -208,7 +208,7 @@ Visualization Manager:
       Displays:
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /uav12/control_manager/safety_area_markers
+          Marker Topic: /uav8/control_manager/safety_area_markers
           Name: SafetyhArea
           Namespaces:
             "": true
@@ -216,7 +216,7 @@ Visualization Manager:
           Value: true
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /uav12/control_manager/disturbances_markers
+          Marker Topic: /uav8/control_manager/disturbances_markers
           Name: Disturbances
           Namespaces:
             control_manager: true
@@ -224,7 +224,7 @@ Visualization Manager:
           Value: true
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /uav12/control_manager/safety_area_coordinates_markers
+          Marker Topic: /uav8/control_manager/safety_area_coordinates_markers
           Name: SafetyAreaCoordinates
           Namespaces:
             "": true
@@ -262,7 +262,7 @@ Visualization Manager:
             Shaft Length: 1
             Shaft Radius: 0.05000000074505806
             Value: Axes
-          Topic: /uav12/control_manager/cmd_odom
+          Topic: /uav8/control_manager/cmd_odom
           Unreliable: false
           Value: true
         - Class: rviz/Group
@@ -281,12 +281,12 @@ Visualization Manager:
               Shaft Length: 0.23000000417232513
               Shaft Radius: 0.009999999776482582
               Shape: Arrow (Flat)
-              Topic: /uav12/control_manager/trajectory_original/poses
+              Topic: /uav8/control_manager/trajectory_original/poses
               Unreliable: false
               Value: true
             - Class: rviz/MarkerArray
               Enabled: true
-              Marker Topic: /uav12/control_manager/trajectory_original/markers
+              Marker Topic: /uav8/control_manager/trajectory_original/markers
               Name: Markers
               Namespaces:
                 {}
@@ -308,7 +308,7 @@ Visualization Manager:
           Queue Size: 10
           Show sectors with no data: false
           Show undetected obstacles: true
-          Topic: /uav12/bumper/obstacle_sectors
+          Topic: /uav8/bumper/obstacle_sectors
           Unreliable: false
           Value: true
           Vertical collision threshold: 1
@@ -348,7 +348,7 @@ Visualization Manager:
             Shaft Length: 1
             Shaft Radius: 0.05000000074505806
             Value: Arrow
-          Topic: /uav12/control_manager/cmd_odom
+          Topic: /uav8/control_manager/cmd_odom
           Unreliable: true
           Value: false
         - Angle Tolerance: 0.009999999776482582
@@ -383,7 +383,7 @@ Visualization Manager:
             Shaft Length: 1
             Shaft Radius: 0.05000000074505806
             Value: Arrow
-          Topic: /uav12/odometry/odom_main
+          Topic: /uav8/odometry/odom_main
           Unreliable: true
           Value: true
       Enabled: true
@@ -392,7 +392,7 @@ Visualization Manager:
       Displays:
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /uav12/trajectory_generation/markers/final
+          Marker Topic: /uav8/trajectory_generation/markers/final
           Name: final
           Namespaces:
             {}
@@ -400,7 +400,7 @@ Visualization Manager:
           Value: true
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /uav12/trajectory_generation/markers/original
+          Marker Topic: /uav8/trajectory_generation/markers/original
           Name: original
           Namespaces:
             {}
@@ -431,14 +431,14 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.10000000149011612
       Style: Flat Squares
-      Topic: /uav12/camera_localization/tdpts
+      Topic: /uav8/camera_localization/tdpts
       Unreliable: true
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /uav12/camera_localization/im_corresp
+      Image Topic: /uav8/camera_localization/im_corresp
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -451,7 +451,7 @@ Visualization Manager:
     - Class: rviz/Camera
       Enabled: false
       Image Rendering: background and overlay
-      Image Topic: /uav12/basler_left/image_raw
+      Image Topic: /uav8/basler_left/image_raw
       Name: left
       Overlay Alpha: 0.5
       Queue Size: 2
@@ -490,7 +490,7 @@ Visualization Manager:
     - Class: rviz/Camera
       Enabled: false
       Image Rendering: background and overlay
-      Image Topic: /uav12/basler_right/image_raw
+      Image Topic: /uav8/basler_right/image_raw
       Name: right
       Overlay Alpha: 0.5
       Queue Size: 2
@@ -528,7 +528,7 @@ Visualization Manager:
       Zoom Factor: 1
     - Class: rviz/MarkerArray
       Enabled: true
-      Marker Topic: /uav12/camera_localization/markerarray
+      Marker Topic: /uav8/camera_localization/markerarray
       Name: MarkerArray
       Namespaces:
         points: true
@@ -537,7 +537,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /uav12/camera_localization/image_left_debug
+      Image Topic: /uav8/camera_localization/image_left_debug
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -549,7 +549,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /uav12/camera_localization/image_right_debug
+      Image Topic: /uav8/camera_localization/image_right_debug
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -563,7 +563,7 @@ Visualization Manager:
   Global Options:
     Background Color: 100; 100; 100
     Default Light: true
-    Fixed Frame: uav12/local_origin
+    Fixed Frame: uav8/local_origin
     Frame Rate: 30
   Name: root
   Tools:
@@ -604,7 +604,7 @@ Visualization Manager:
       Name: Current View
       Near Clip Distance: 0.009999999776482582
       Pitch: 0.1397971212863922
-      Target Frame: uav12/fcu
+      Target Frame: uav8/fcu
       Yaw: 0.8522243499755859
     Saved: ~
 Window Geometry:
