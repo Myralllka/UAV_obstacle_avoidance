@@ -63,6 +63,10 @@
             <rosparam file="$(find uav_camera_localization)/config/cameras_roi.yaml"/>
 
             <!-- Subscribers (note that the topic names will also be remapped using the namespace as a prefix) -->
+            <remap from="~fleft_caminfo" to="/$(arg UAV_NAME)/fleft/camera/camera_info"/>
+            <remap from="~fright_caminfo" to="/$(arg UAV_NAME)/fright/camera/camera_info"/>
+            <remap from="~fleft_imraw" to="/$(arg UAV_NAME)/fleft/camera/image_raw"/>
+            <remap from="~fright_imraw" to="/$(arg UAV_NAME)/fright/camera/image_raw"/>
 
             <!-- Publishers (note that the topic names will also be remapped using the namespace as a prefix) -->
 

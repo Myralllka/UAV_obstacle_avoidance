@@ -94,20 +94,10 @@ namespace camera_localization {
             m_pub_im_corresp = nh.advertise<sensor_msgs::Image>("im_corresp", 1);
         }
         // | ---------------- subscribers initialize ------------------ |
-//        m_sub_camfleft = nh.subscribe("/" + m_uav_name + "/fleft/camera/image_raw",
-//                                      1,
-//                                      &CameraLocalization::m_cbk_camfleft,
-//                                      this);
-//
-//        m_sub_camfright = nh.subscribe("/" + m_uav_name + "/fright/camera/image_raw",
-//                                       1,
-//                                       &CameraLocalization::m_cbk_camfright,
-//                                       this);
 
-        m_sub_camfleft.subscribe(nh, "/" + m_uav_name + "/fleft/camera/image_raw", 1);
-        m_sub_camfright.subscribe(nh, "/" + m_uav_name + "/fright/camera/image_raw", 1);
-//        m_time_sync.connectInput(m_sub_camfleft, m_sub_camfright);
-//        m_time_sync.registerCallback(boost::bind(&CameraLocalization::m_cbk_images, this, _1, _2));
+        m_sub_camfleft.subscribe(nh, "fleft_imraw", 1);
+        m_sub_camfright.subscribe(nh, "fright_imraw", 1);
+
         m_time_sync = boost::make_shared<message_filters::Synchronizer<approx_time_sync_images_t>>(
                 approx_time_sync_images_t(4),
                 m_sub_camfleft,
@@ -135,10 +125,10 @@ namespace camera_localization {
 
         mrs_lib::construct_object(handler_camleftinfo,
                                   shopt,
-                                  "/" + m_uav_name + "/fleft/camera/camera_info");
+                                  "fleft_caminfo");
         mrs_lib::construct_object(handler_camrightinfo,
                                   shopt,
-                                  "/" + m_uav_name + "/fright/camera/camera_info");
+                                  "fright_caminfo");
         // initialize cameras with pinhole modeller
         while (not(handler_camleftinfo.newMsg() and handler_camrightinfo.newMsg())) {
             ROS_WARN_THROTTLE(1.0, "[%s]: waiting for camera info messages", NODENAME.c_str());
@@ -315,7 +305,7 @@ namespace camera_localization {
                     cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, im_matches).toImageMsg());
             ROS_INFO_THROTTLE(2.0, "[%s & OpenCV]: Correspondences published", NODENAME.c_str());
         }
-        std::vector<Eigen::Vector3d> res_pts_3d;
+        std::vector<Eigen::Vector3d> res_pts_3d, res_pts_3d_tmp;
         if (m_method_triang == "svd") {
             cv::Mat res_4d_homogenous;
             try {
@@ -326,12 +316,21 @@ namespace camera_localization {
                 std::cout << e.what() << std::endl;
                 return;
             }
-            res_pts_3d = X2td(res_4d_homogenous);
+            res_pts_3d_tmp = X2td(res_4d_homogenous);
         } else if (m_method_triang == "primitive") {
-            res_pts_3d = triangulate_primitive(kpts_filtered_1_rect, kpts_filtered_2_rect);
+            res_pts_3d_tmp = triangulate_primitive(kpts_filtered_1_rect, kpts_filtered_2_rect);
         } else {
             ROS_ERROR("[%s]: unknown triangulation method", NODENAME.c_str());
             ros::shutdown();
+        }
+        for (const auto &pt: res_pts_3d_tmp) {
+            if (pt.x() > 0) {
+                res_pts_3d.push_back(pt);
+            }
+        }
+        if (res_pts_3d.size() < 3) {
+            ROS_ERROR("[%s]: no points found after triangulation and filtering", NODENAME.c_str());
+            return;
         }
         std::vector<cv::Scalar> colors;
         if (m_debug_markers or m_debug_distances) {
@@ -387,7 +386,6 @@ namespace camera_localization {
         pts2cloud(res_pts_3d, pc_res, m_name_base);
 //            sensor_msgs::PointCloud2 pc_res;
         m_pub_pcld.publish(pc_res);
-
     }
 
 

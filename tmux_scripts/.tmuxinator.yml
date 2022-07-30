@@ -8,50 +8,29 @@ windows:
       layout: tiled
       panes:
         - roscore
-  - gazebo:
+  - pylon_camera_driver:
       layout: tiled
       panes:
-        - waitForRos; roslaunch mrs_simulation simulation.launch world_name:=mrs_city gui:=false
-        - waitForOdometry; gz camera -c gzclient_camera -f ${UAV_NAME}; history -s gz camera -c gzclient_camera -f ${UAV_NAME}
-        - waitFowOdometry; rosrun tf2_ros static_transform_publisher 0 0 0 0 0 0 1 /${UAV_NAME}/fcu /${UAV_NAME}/basler_stereopair/base
-  - status:
+        - waitForRos; roslaunch pylon_camera morhunenko.launch
+  - rqt_imgs:
       layout: tiled
       panes:
-        - waitForSimulation; roslaunch mrs_uav_status status.launch
-  - spawn:
-      layout: tiled
-      panes:
-        - waitForSimulation; rosservice call /mrs_drone_spawner/spawn "${UAV_NUMBERS[1]} $UAV_TYPE --enable-rangefinder --enable-basler-stereopair"
-  - control:
-      layout: tiled
-      panes:
-        - waitForOdometry; roslaunch mrs_uav_general core.launch
-  - takeoff:
-      layout: tiled
-      panes:
-        - waitForSimulation; roslaunch mrs_uav_general automatic_start.launch
-        - 'waitForControl;
-          rosservice call /$UAV_NAME/mavros/cmd/arming 1;
-          sleep 2;
-          rosservice call /$UAV_NAME/mavros/set_mode 0 offboard'
-  - image_viewer:
-      layout: tiled
-      panes:
-        - waitForSimulation; rosrun rqt_image_view rqt_image_view /${UAV_NAME}/fleft/camera/image_raw
-        - waitForSimulation; rosrun rqt_image_view rqt_image_view /${UAV_NAME}/fright/camera/image_raw
+        - waitForRos; rosrun rqt_image_view rqt_image_view /${UAV_NAME}/camera_localization/image_left_debug
+        - waitForRos; rosrun rqt_image_view rqt_image_view /${UAV_NAME}/camera_localization/image_right_debug
+        - waitForRos; rosrun rqt_image_view rqt_image_view /${UAV_NAME}/camera_localization/im_corresp
   - rviz:
       layout: tiled
       panes:
-        - waitForRos; roscd uav_camera_localization; ./scripts/change_uav.sh ${UAV_NAME}; rviz -d $(rospack find uav_camera_localization)/rviz/simulation.rviz
-        - waitForControl; roslaunch mrs_rviz_plugins load_robot.launch
+#        - 'history -s "waitForRos; rviz -d $(rospack find basler_stereopair_driver)/rviz/config.rviz"'
+        - waitForRos; roscd uav_camera_localization; ./scripts/change_uav.sh ${UAV_NAME}; rviz -d $(rospack find uav_camera_localization)/rviz/device.rviz
+  - basler_driver:
+      layout: tiled
+      panes:
+        - waitForRos; roslaunch basler_stereopair_driver basler_stereopair_driver.launch is_calibrated:=true
   - uav_camera_localization:
       layout: even-horizontal
       panes:
         - waitForRos; roslaunch uav_camera_localization uav_camera_localization.launch
-        - waitForRos; rostopic hz /${UAV_NAME}/fright/camera/image_raw
         - waitForRos; rostopic hz /${UAV_NAME}/fleft/camera/image_raw
+        - waitForRos; rostopic hz /${UAV_NAME}/fright/camera/image_raw
         - waitForRos; rostopic hz /${UAV_NAME}/camera_localization/tdpts
-  - camera_calibration:
-      layout: even-horizontal
-      panes:
-        - history -s "roslaunch calibration_gazebo landmark.launch"

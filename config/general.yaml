@@ -1,14 +1,14 @@
 corresp:
   n_features: 300
-  distance_threshold_px: 2
+  distance_threshold_px: 4
+  reprojection_error_px: 4
   distances_ratio: 1
-  reprojection_error_px: 2
   encoding: "bgr8"
 
 debug_sett:
-  debug_matches:   false
-  debug_markers:   false
-  debug_distances: false
+  debug_matches:   true
+  debug_markers:   true
+  debug_distances: true
 
 algorithms:
   #  triangulation method can be so-called primitive or svd
