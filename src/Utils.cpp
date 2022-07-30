@@ -117,7 +117,7 @@ namespace camera_localization {
                                    kpts_l,
                                    desc_l);
 
-        return {std::move(kpts_l), std::move(desc_l)};
+        return {kpts_l, desc_l};
     }
 
     [[maybe_unused]] visualization_msgs::Marker create_marker_ray(const Eigen::Vector3d &pt,

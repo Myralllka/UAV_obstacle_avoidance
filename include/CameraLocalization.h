@@ -135,7 +135,7 @@ namespace camera_localization {
 
         // | ------------------- detection modules -------------------- |
         cv::Mat m_img_debug_fleft, m_img_debug_fright;
-        std::mutex m_mut_pts_left, m_mut_pts_right;
+        std::mutex m_mut_pts;
 
         barrier m_barrier{2};
         cv::Mat m_desc_left, m_desc_right;

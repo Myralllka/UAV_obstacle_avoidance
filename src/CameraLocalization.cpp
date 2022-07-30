@@ -232,20 +232,22 @@ namespace camera_localization {
         const auto fnum = m_n_features;
         std::vector<cv::Mat> masks{m_mask_left, m_mask_right};
         std::vector<sensor_msgs::ImageConstPtr> msgs{msg_left, msg_right};
-        std::vector<cv::Mat> descs{2};
-        std::vector<std::vector<cv::KeyPoint>> kptss{2};
+        std::vector<cv::Mat> descs;
+        std::vector<std::vector<cv::KeyPoint>> kptss;
+        descs.resize(2);
+        kptss.resize(2);
 #pragma omp parallel for default(none) shared(msgs, masks, kptss, descs) firstprivate(fnum, encode)
         for (int i = 0; i < 2; ++i) {
             auto[kpts, desc] = det_and_desc_general(msgs[i], encode, masks[i], fnum);
-            kptss[i] = (std::move(kpts));
-            descs[i] = (std::move(desc));
+            kptss.at(i) = std::move(kpts);
+            descs.at(i) = desc;
         }
         {
-            std::scoped_lock lt{m_mut_pts_right, m_mut_pts_left};
+            std::lock_guard lt{m_mut_pts};
             m_kpts_left = std::move(kptss[0]);
             m_kpts_right = std::move(kptss[1]);
-            m_desc_left = std::move(descs[0]);
-            m_desc_right = std::move(descs[1]);
+            m_desc_left = descs[0];
+            m_desc_right = descs[1];
             if (m_debug_markers or m_debug_distances or m_debug_matches) {
                 m_img_debug_fleft = cv_bridge::toCvShare(msg_left, m_imgs_encoding).get()->image;
                 m_img_debug_fright = cv_bridge::toCvShare(msg_right, m_imgs_encoding).get()->image;
@@ -263,11 +265,11 @@ namespace camera_localization {
         std::vector<cv::KeyPoint> keypoints1, keypoints2;
         m_barrier.wait();
         {
-            std::scoped_lock lt{m_mut_pts_left, m_mut_pts_right};
+            std::lock_guard lt{m_mut_pts};
             descriptor1 = m_desc_left;
             descriptor2 = m_desc_right;
-            keypoints1 = m_kpts_left;
-            keypoints2 = m_kpts_right;
+            keypoints1 = std::move(m_kpts_left);
+            keypoints2 = std::move(m_kpts_right);
             if (m_debug_distances or m_debug_matches or m_debug_markers) {
                 m_img_debug_fleft.copyTo(imleft);
                 m_img_debug_fright.copyTo(imright);
