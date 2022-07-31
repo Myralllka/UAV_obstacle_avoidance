@@ -16,6 +16,8 @@
 #include <vector>
 #include <random>
 #include <utility>
+#include <chrono>
+#include <thread>
 
 /* custom helper functions from our library */
 #include <mrs_lib/param_loader.h>
@@ -64,10 +66,10 @@ namespace camera_localization {
         const std::string NODENAME{"CameraLocalization"};
         /* flags */
         bool m_is_initialized = false;
-        std::atomic<bool> m_is_fleft_available = false, m_is_right_available = false;
-        bool m_debug_matches;
-        bool m_debug_distances;
-        bool m_debug_markers;
+
+        bool m_debug_matches, m_debug_distances, m_debug_markers;
+
+        bool m_img_ready = false, m_features_ready = false;
 
         /* ros parameters */
         std::string m_uav_name;
@@ -94,26 +96,19 @@ namespace camera_localization {
         size_t m_distance_threshold;
         // TODO: generalize
         cv::Rect rect_l, rect_r;
-        cv::Mat m_mask_left{cv::Mat::zeros(cv::Size{1600, 1200}, CV_8U)};
-        cv::Mat m_mask_right{cv::Mat::zeros(cv::Size{1600, 1200}, CV_8U)};
-
+        cv::UMat m_mask_left{cv::UMat::zeros(cv::Size{1600, 1200}, CV_8U)};
+        cv::UMat m_mask_right{cv::UMat::zeros(cv::Size{1600, 1200}, CV_8U)};
+        std::vector<cv::UMat> m_masks;
         Eigen::Affine3d m_fleft_pose, m_fright_pose;
         // | --------------------- MRS transformer -------------------- |
 
         mrs_lib::Transformer m_transformer;
 
         // | ---------------------- msg callbacks --------------------- |
-//        void m_cbk_camfleft(const sensor_msgs::ImageConstPtr &msg);
-//
-//        void m_cbk_camfright(const sensor_msgs::ImageConstPtr &msg);
-
-        void m_cbk_images(const sensor_msgs::ImageConstPtr &msg_left,
-                          const sensor_msgs::ImageConstPtr &msg_right);
+        void m_cbk_save_images(const sensor_msgs::ImageConstPtr &msg_left,
+                               const sensor_msgs::ImageConstPtr &msg_right);
 
         // | --------------------- timer callbacks -------------------- |
-        ros::Timer m_tim_corresp;
-
-        [[maybe_unused]] void m_tim_cbk_corresp([[maybe_unused]] const ros::TimerEvent &ev);
 
         // | ----------------------- publishers ----------------------- |
 
@@ -126,28 +121,30 @@ namespace camera_localization {
         // | ----------------------- subscribers ---------------------- |
         message_filters::Subscriber<sensor_msgs::Image> m_sub_camfleft;
         message_filters::Subscriber<sensor_msgs::Image> m_sub_camfright;
-//        using approx_time_sync_images_t = message_filters::TimeSynchronizer<sensor_msgs::Image, sensor_msgs::Image>;
+
         using approx_time_sync_images_t = message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image>;
         boost::shared_ptr<message_filters::Synchronizer<approx_time_sync_images_t>> m_time_sync;
 
-//        ros::Subscriber m_sub_camfleft;
-//        ros::Subscriber m_sub_camfright;
-
         // | ------------------- detection modules -------------------- |
         cv::Mat m_img_debug_fleft, m_img_debug_fright;
-        std::mutex m_mut_pts;
+        std::mutex m_mut_imgs, m_mut_features;
+        std::condition_variable m_cv_image, m_cv_features;
 
-        barrier m_barrier{2};
-        cv::Mat m_desc_left, m_desc_right;
-        std::vector<cv::KeyPoint> m_kpts_left, m_kpts_right;
+        cv::Mat m_img_left, m_img_right;
 
+        std::vector<features_t> m_features;
         // | ---------------- pinhole camera models ------------------- |
         image_geometry::PinholeCameraModel m_camera_left;
         image_geometry::PinholeCameraModel m_camera_right;
 
         cv::Point3d OL_frameR, OR_frameL, m_o1_3d, m_o2_3d;
         cv::Point2d m_o1_2d, m_o2_2d;
+
         // | --------------------- other functions -------------------- |
+
+        [[maybe_unused]] void m_features_detection();
+
+        [[maybe_unused]] void m_corresp_matching();
 
         // ------------------------ UTILS -----------------------------
 

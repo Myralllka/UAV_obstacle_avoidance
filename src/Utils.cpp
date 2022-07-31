@@ -120,6 +120,24 @@ namespace camera_localization {
         return {kpts_l, desc_l};
     }
 
+    [[maybe_unused]] feature_t det_and_desc_general(const cv::UMat &in_img,
+                                                    const cv::UMat &mask,
+                                                    int n_features) {
+
+        cv::UMat img_gray;
+        feature_t res{};
+
+        cv::cvtColor(in_img, img_gray, cv::COLOR_BGR2GRAY);
+
+        auto detector = cv::ORB::create(n_features);
+        detector->detectAndCompute(img_gray,
+                                   mask,
+                                   res.kpts,
+                                   res.descs);
+
+        return res;
+    }
+
     [[maybe_unused]] visualization_msgs::Marker create_marker_ray(const Eigen::Vector3d &pt,
                                                                   const Eigen::Vector3d &O,
                                                                   const std::string &cam_name,

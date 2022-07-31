@@ -56,6 +56,12 @@ namespace camera_localization {
     template<typename T>
     T rad2deg(const T x) { return x / M_PI * 180; }
 
+    // features
+    struct feature_t {
+        std::vector<cv::KeyPoint> kpts;
+        cv::Mat descs;
+    };
+
     template<class Derived>
     Eigen::Matrix<typename Derived::Scalar, 3, 3> sqs(const Eigen::MatrixBase<Derived> &vec) {
         EIGEN_STATIC_ASSERT_VECTOR_SPECIFIC_SIZE(Derived, 3)
@@ -146,6 +152,10 @@ namespace camera_localization {
                          const std::string &im_encoding,
                          const cv::Mat &mask,
                          int n_features = 300);
+
+    [[maybe_unused]] feature_t det_and_desc_general(const cv::UMat &in_img,
+                                                    const cv::UMat &mask,
+                                                    int n_features);
 }
 
 

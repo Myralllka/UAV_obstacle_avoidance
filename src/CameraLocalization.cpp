@@ -8,9 +8,9 @@ namespace camera_localization {
 /* onInit() method //{ */
     void CameraLocalization::onInit() {
 
-//        if (cv::ocl::haveOpenCL()) {
-//            cv::ocl::setUseOpenCL(true);
-//        }
+        if (cv::ocl::haveOpenCL()) {
+            cv::ocl::setUseOpenCL(true);
+        }
         // | ---------------- set my booleans to false ---------------- |
 
         /* obtain node handle */
@@ -65,6 +65,9 @@ namespace camera_localization {
         rect_r = cv::Rect{rroi[0], rroi[1], rroi[2], rroi[3]};
         m_mask_left(rect_l) = cv::Scalar{255};
         m_mask_right(rect_r) = cv::Scalar{255};
+        m_masks.resize(2);
+        m_masks.at(0) = (m_mask_left);
+        m_masks.at(1) = (m_mask_right);
 
         if (tmp_thr < 0) {
             ROS_ERROR("[%s]: wrong distance_threshold_px parameter: should be x > 0", NODENAME.c_str());
@@ -102,17 +105,13 @@ namespace camera_localization {
                 approx_time_sync_images_t(4),
                 m_sub_camfleft,
                 m_sub_camfright);
-        m_time_sync->registerCallback(&CameraLocalization::m_cbk_images, this);
+        m_time_sync->registerCallback(&CameraLocalization::m_cbk_save_images, this);
 
         // | --------------------- tf transformer --------------------- |
         m_transformer = mrs_lib::Transformer("CameraLocalization");
         m_transformer.setDefaultPrefix(m_uav_name);
 
         // | -------------------- initialize timers ------------------- |
-        // here ros::Duration() should provide working rate of about 33hz
-        m_tim_corresp = nh.createTimer(ros::Duration(0.03),
-                                       &CameraLocalization::m_tim_cbk_corresp,
-                                       this);
 
         // | -------------------- other static preperation ------------------- |
 
@@ -149,6 +148,10 @@ namespace camera_localization {
         ros::Duration(1.0).sleep();
         setUp();
         ROS_INFO_ONCE("[CameraLocalization]: initialized");
+
+        std::thread t_features{&CameraLocalization::m_features_detection, this};
+        std::thread t_corresp{&CameraLocalization::m_corresp_matching, this};
+
         m_is_initialized = true;
     }
 //}
@@ -216,180 +219,194 @@ namespace camera_localization {
 
 // | ---------------------- msg callbacks --------------------- |
 
-    void CameraLocalization::m_cbk_images(const sensor_msgs::ImageConstPtr &msg_left,
-                                          const sensor_msgs::ImageConstPtr &msg_right) {
-        const auto encode = m_imgs_encoding;
-        const auto fnum = m_n_features;
-        std::vector<cv::Mat> masks{m_mask_left, m_mask_right};
-        std::vector<sensor_msgs::ImageConstPtr> msgs{msg_left, msg_right};
-        std::vector<cv::Mat> descs;
-        std::vector<std::vector<cv::KeyPoint>> kptss;
-        descs.resize(2);
-        kptss.resize(2);
-#pragma omp parallel for default(none) shared(msgs, masks, kptss, descs) firstprivate(fnum, encode)
-        for (int i = 0; i < 2; ++i) {
-            auto[kpts, desc] = det_and_desc_general(msgs[i], encode, masks[i], fnum);
-            kptss.at(i) = std::move(kpts);
-            descs.at(i) = desc;
-        }
-        {
-            std::lock_guard lt{m_mut_pts};
-            m_kpts_left = std::move(kptss[0]);
-            m_kpts_right = std::move(kptss[1]);
-            m_desc_left = descs[0];
-            m_desc_right = descs[1];
-            if (m_debug_markers or m_debug_distances or m_debug_matches) {
-                m_img_debug_fleft = cv_bridge::toCvShare(msg_left, m_imgs_encoding).get()->image;
-                m_img_debug_fright = cv_bridge::toCvShare(msg_right, m_imgs_encoding).get()->image;
-            }
-        }
-        m_barrier.wait();
+    void CameraLocalization::m_cbk_save_images(const sensor_msgs::ImageConstPtr &msg_left,
+                                               const sensor_msgs::ImageConstPtr &msg_right) {
+        std::unique_lock ul{m_mut_imgs};
+        m_img_left = cv_bridge::toCvShare(msg_left, m_imgs_encoding).get()->image;
+        m_img_right = cv_bridge::toCvShare(msg_right, m_imgs_encoding).get()->image;
+        m_img_ready = true;
+        ul.unlock();
+        m_cv_image.notify_one();
     }
 
 // | --------------------- timer callbacks -------------------- |
 
-    void CameraLocalization::m_tim_cbk_corresp([[maybe_unused]] const ros::TimerEvent &ev) {
-        if (not m_is_initialized) return;
-        ROS_WARN_THROTTLE(2.0, "[%s]: No new images to search for correspondences", NODENAME.c_str());
-        cv::Mat descriptor1, descriptor2, imright, imleft;
-        std::vector<cv::KeyPoint> keypoints1, keypoints2;
-        m_barrier.wait();
-        {
-            std::lock_guard lt{m_mut_pts};
-            descriptor1 = m_desc_left;
-            descriptor2 = m_desc_right;
-            keypoints1 = std::move(m_kpts_left);
-            keypoints2 = std::move(m_kpts_right);
-            if (m_debug_distances or m_debug_matches or m_debug_markers) {
-                m_img_debug_fleft.copyTo(imleft);
-                m_img_debug_fright.copyTo(imright);
+// | -------------------- other functions ------------------- |
+
+    void CameraLocalization::m_features_detection() {
+        while (not m_is_initialized) {}
+        ROS_INFO("[%s]: ", NODENAME.c_str());
+
+        while (ros::ok()) {
+            cv::UMat img_left, img_right;
+            std::vector<cv::UMat> imgs;
+            imgs.reserve(2);
+            {
+                std::unique_lock ul{m_mut_imgs};
+                using namespace std::chrono_literals;
+                m_cv_image.wait_for(ul, 100ms, [&] { return m_img_ready; });
+                m_img_ready = false;
+                imgs.at(0) = m_img_left.getUMat(cv::ACCESS_RW);
+                imgs.at(1) = m_img_right.getUMat(cv::ACCESS_RW);
             }
-        }
 
-        if ((keypoints1.size() < 10) or (keypoints2.size() < 10)) {
-            ROS_WARN_THROTTLE(1.0, "[%s]: no keypoints visible", NODENAME.c_str());
-            return;
-        }
-
-        std::vector<cv::DMatch> matches;
-        matcher->match(descriptor1,
-                       descriptor2,
-                       matches,
-                       cv::Mat());
-        // drop bad matches
-        std::sort(matches.begin(), matches.end());
-        const int num_good_matches = static_cast<int>(std::round(static_cast<double>(matches.size()) *
-                                                                 m_distance_ratio));
-        matches.erase(matches.begin() + num_good_matches, matches.end());
-
-        std::vector<cv::DMatch> matches_filtered;
-        std::vector<cv::Point2d> kpts_filtered_1, kpts_filtered_2, kpts_filtered_1_rect, kpts_filtered_2_rect;
-
-        filter_matches(matches,
-                       keypoints1, keypoints2,
-                       m_o1_2d, m_o2_2d,
-                       matches_filtered,
-                       kpts_filtered_1, kpts_filtered_2,
-                       kpts_filtered_1_rect, kpts_filtered_2_rect);
-
-        if (m_debug_matches) {
-            cv::Mat im_matches;
-            cv::drawMatches(m_img_debug_fleft, keypoints1,
-                            m_img_debug_fright, keypoints2,
-                            matches_filtered,
-                            im_matches,
-                            cv::Scalar::all(-1), cv::Scalar::all(-1),
-                            std::vector<char>(),
-                            cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-            m_pub_im_corresp.publish(
-                    cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, im_matches).toImageMsg());
-            ROS_INFO_THROTTLE(2.0, "[%s & OpenCV]: Correspondences published", NODENAME.c_str());
-        }
-        std::vector<Eigen::Vector3d> res_pts_3d, res_pts_3d_tmp;
-        if (m_method_triang == "svd") {
-            cv::Mat res_4d_homogenous;
-            try {
-                cv::triangulatePoints(m_P_L_cv, m_P_R_cv,
-                                      kpts_filtered_1_rect, kpts_filtered_2_rect,
-                                      res_4d_homogenous);
-            } catch (cv::Exception &e) {
-                std::cout << e.what() << std::endl;
-                return;
+            std::vector<feature_t> features;
+            features.resize(2);
+            const auto fnum = m_n_features;
+#pragma omp parallel for default(none) firstprivate(fnum, m_masks) shared(features, imgs)
+            for (int i = 0; i < 2; ++i) {
+                features.at(i) = det_and_desc_general(imgs[i], m_masks[i], fnum);
             }
-            res_pts_3d_tmp = X2td(res_4d_homogenous);
-        } else if (m_method_triang == "primitive") {
-            res_pts_3d_tmp = triangulate_primitive(kpts_filtered_1_rect, kpts_filtered_2_rect);
-        } else {
-            ROS_ERROR("[%s]: unknown triangulation method", NODENAME.c_str());
-            ros::shutdown();
+            std::unique_lock ul{m_mut_features};
+            m_features = std::move(features);
+            m_features_ready = true;
+            ul.unlock();
+            m_cv_features.notify_one();
         }
-        for (const auto &pt: res_pts_3d_tmp) {
-            if (pt.x() > 0) {
-                res_pts_3d.push_back(pt);
-            }
-        }
-        if (res_pts_3d.size() < 3) {
-            ROS_ERROR("[%s]: no points found after triangulation and filtering", NODENAME.c_str());
-            return;
-        }
-        std::vector<cv::Scalar> colors;
-        if (m_debug_markers or m_debug_distances) {
-            for (size_t i = 0; i < matches.size(); ++i) {
-                const auto color = generate_random_color();
-                colors.push_back(color);
-            }
-        }
-        Eigen::Vector3d O{0, 0, 0};
-        auto markerarr = boost::make_shared<visualization_msgs::MarkerArray>();
-        if (m_debug_markers) {
-            int counter = 0;
-            for (size_t i = 0; i < matches_filtered.size(); ++i) {
-                const auto pt1_2d = m_camera_left.rectifyPoint(kpts_filtered_1[i]);
-                const auto pt2_2d = m_camera_right.rectifyPoint(kpts_filtered_2[i]);
-                const auto cv_ray1 = m_camera_left.projectPixelTo3dRay(pt1_2d);
-                const auto cv_ray2 = m_camera_right.projectPixelTo3dRay(pt2_2d);
-
-                const Eigen::Vector3d eigen_vec1{cv_ray1.x, cv_ray1.y, cv_ray1.z};
-                const Eigen::Vector3d eigen_vec2{cv_ray2.x, cv_ray2.y, cv_ray2.z};
-
-                markerarr->markers.emplace_back(create_marker_ray(eigen_vec1, O, m_name_CL, counter++, colors[i]));
-                markerarr->markers.emplace_back(create_marker_ray(eigen_vec2, O, m_name_CR, counter++, colors[i]));
-                markerarr->markers.push_back(create_marker_pt(m_name_base, res_pts_3d[i], counter++, colors[i]));
-            }
-        }
-
-        if (m_debug_distances) {
-            cv::rectangle(imleft, rect_l, cv::Scalar{0, 100, 0}, 2);
-            cv::rectangle(imright, rect_r, cv::Scalar{0, 100, 0}, 2);
-
-            for (size_t i = 0; i < res_pts_3d.size(); ++i) {
-                std::ostringstream out;
-                out.precision(2);
-                out << std::fixed << res_pts_3d[i].norm();
-                cv::putText(imleft, out.str(), kpts_filtered_1[i],
-                            cv::FONT_HERSHEY_PLAIN, 1, colors[i], 2);
-
-                cv::putText(imright, out.str(), kpts_filtered_2[i],
-                            cv::FONT_HERSHEY_PLAIN, 1, colors[i], 2);
-            }
-            m_pub_im_left_debug.publish(
-                    cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imleft).toImageMsg());
-            m_pub_im_right_debug.publish(
-                    cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imright).toImageMsg());
-        }
-
-        if (m_debug_markers) {
-            m_pub_markarray.publish(markerarr);
-        }
-
-        auto pc_res = boost::make_shared<sensor_msgs::PointCloud2>();
-        pts2cloud(res_pts_3d, pc_res, m_name_base);
-//            sensor_msgs::PointCloud2 pc_res;
-        m_pub_pcld.publish(pc_res);
     }
 
+    void CameraLocalization::m_corresp_matching() {
+        while (not m_is_initialized) {}
+        std::cout << "1" << std::endl;
+        while (ros::ok()) {
+            std::cout << "2" << std::endl;
+            std::vector<feature_t> l_features;
+            {
+                std::unique_lock ul{m_mut_features};
+                using namespace std::chrono_literals;
+                m_cv_features.wait_for(ul, 100ms, [&] { return m_features_ready; });
+                m_features_ready = false;
+                l_features = std::move(m_features);
+            }
 
-// | -------------------- other functions ------------------- |
+            std::cout << "3" << std::endl;
+            if ((l_features.at(0).kpts.size() < 10) or (l_features.at(1).kpts.size() < 10)) {
+                ROS_WARN_THROTTLE(1.0, "[%s]: no keypoints visible", NODENAME.c_str());
+                continue;
+            }
+
+            std::cout << "4" << std::endl;
+            std::vector<cv::DMatch> matches;
+            matcher->match(l_features.at(0).descs,
+                           l_features.at(1).descs,
+                           matches,
+                           cv::Mat());
+            // drop bad matches
+            std::sort(matches.begin(), matches.end());
+            const int num_good_matches = static_cast<int>(std::round(static_cast<double>(matches.size()) *
+                                                                     m_distance_ratio));
+            matches.erase(matches.begin() + num_good_matches, matches.end());
+
+            std::vector<cv::DMatch> matches_filtered;
+            std::vector<cv::Point2d> kpts_filtered_1, kpts_filtered_2, kpts_filtered_1_rect, kpts_filtered_2_rect;
+
+            std::cout << "5" << std::endl;
+            filter_matches(matches,
+                           l_features.at(0).kpts, l_features.at(1).kpts,
+                           m_o1_2d, m_o2_2d,
+                           matches_filtered,
+                           kpts_filtered_1, kpts_filtered_2,
+                           kpts_filtered_1_rect, kpts_filtered_2_rect);
+
+            std::cout << "6" << std::endl;
+            if (m_debug_matches) {
+                cv::Mat im_matches;
+                cv::drawMatches(m_img_debug_fleft, l_features.at(0).kpts,
+                                m_img_debug_fright, l_features.at(1).kpts,
+                                matches_filtered,
+                                im_matches,
+                                cv::Scalar::all(-1), cv::Scalar::all(-1),
+                                std::vector<char>(),
+                                cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+                m_pub_im_corresp.publish(
+                        cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, im_matches).toImageMsg());
+                ROS_INFO_THROTTLE(2.0, "[%s & OpenCV]: Correspondences published", NODENAME.c_str());
+            }
+
+            std::cout << "6" << std::endl;
+            std::vector<Eigen::Vector3d> res_pts_3d, res_pts_3d_tmp;
+            if (m_method_triang == "svd") {
+                cv::Mat res_4d_homogenous;
+                try {
+                    cv::triangulatePoints(m_P_L_cv, m_P_R_cv,
+                                          kpts_filtered_1_rect, kpts_filtered_2_rect,
+                                          res_4d_homogenous);
+                } catch (cv::Exception &e) {
+                    std::cout << e.what() << std::endl;
+                    continue;
+                }
+                res_pts_3d_tmp = X2td(res_4d_homogenous);
+            } else if (m_method_triang == "primitive") {
+                res_pts_3d_tmp = triangulate_primitive(kpts_filtered_1_rect, kpts_filtered_2_rect);
+            } else {
+                ROS_ERROR("[%s]: unknown triangulation method", NODENAME.c_str());
+                ros::shutdown();
+            }
+            for (const auto &pt: res_pts_3d_tmp) {
+                if (pt.x() > 0) {
+                    res_pts_3d.push_back(pt);
+                }
+            }
+            if (res_pts_3d.size() < 3) {
+                ROS_ERROR("[%s]: no points found after triangulation and filtering", NODENAME.c_str());
+                continue;
+            }
+            std::vector<cv::Scalar> colors;
+            if (m_debug_markers or m_debug_distances) {
+                for (size_t i = 0; i < matches.size(); ++i) {
+                    const auto color = generate_random_color();
+                    colors.push_back(color);
+                }
+            }
+            Eigen::Vector3d O{0, 0, 0};
+            auto markerarr = boost::make_shared<visualization_msgs::MarkerArray>();
+
+            if (m_debug_markers) {
+                int counter = 0;
+                for (size_t i = 0; i < matches_filtered.size(); ++i) {
+                    const auto pt1_2d = m_camera_left.rectifyPoint(kpts_filtered_1[i]);
+                    const auto pt2_2d = m_camera_right.rectifyPoint(kpts_filtered_2[i]);
+                    const auto cv_ray1 = m_camera_left.projectPixelTo3dRay(pt1_2d);
+                    const auto cv_ray2 = m_camera_right.projectPixelTo3dRay(pt2_2d);
+
+                    const Eigen::Vector3d eigen_vec1{cv_ray1.x, cv_ray1.y, cv_ray1.z};
+                    const Eigen::Vector3d eigen_vec2{cv_ray2.x, cv_ray2.y, cv_ray2.z};
+
+                    markerarr->markers.emplace_back(create_marker_ray(eigen_vec1, O, m_name_CL, counter++, colors[i]));
+                    markerarr->markers.emplace_back(create_marker_ray(eigen_vec2, O, m_name_CR, counter++, colors[i]));
+                    markerarr->markers.push_back(create_marker_pt(m_name_base, res_pts_3d[i], counter++, colors[i]));
+                }
+                m_pub_markarray.publish(markerarr);
+            }
+
+            if (m_debug_distances) {
+                cv::rectangle(imleft, rect_l, cv::Scalar{0, 100, 0}, 2);
+                cv::rectangle(imright, rect_r, cv::Scalar{0, 100, 0}, 2);
+
+                for (size_t i = 0; i < res_pts_3d.size(); ++i) {
+                    std::ostringstream out;
+                    out.precision(2);
+                    out << std::fixed << res_pts_3d[i].norm();
+                    cv::putText(imleft, out.str(), kpts_filtered_1[i],
+                                cv::FONT_HERSHEY_PLAIN, 1, colors[i], 2);
+
+                    cv::putText(imright, out.str(), kpts_filtered_2[i],
+                                cv::FONT_HERSHEY_PLAIN, 1, colors[i], 2);
+                }
+                m_pub_im_left_debug.publish(
+                        cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imleft).toImageMsg());
+                m_pub_im_right_debug.publish(
+                        cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imright).toImageMsg());
+            }
+
+            std::cout << "7" << std::endl;
+            auto pc_res = boost::make_shared<sensor_msgs::PointCloud2>();
+            pts2cloud(res_pts_3d, pc_res, m_name_base);
+//            sensor_msgs::PointCloud2 pc_res;
+            std::cout << "8" << std::endl;
+            m_pub_pcld.publish(pc_res);
+        }
+    }
 
     // ===================== UTILS =====================
     std::vector<Eigen::Vector3d> CameraLocalization::triangulate_primitive(const std::vector<cv::Point2d> &kpts1,

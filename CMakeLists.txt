@@ -46,7 +46,7 @@ include_directories(include
         ${OpenCV_INCLUDE_DIRS}
         ${Eigen_INCLUDE_DIRS}
         )
-
+find_package(Threads REQUIRED)
 find_package(OpenMP)
 if (OPENMP_FOUND)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -61,6 +61,7 @@ add_library(${FILESNAME} src/${FILESNAME}.cpp src/Utils.cpp include/Utils.h incl
 
 add_dependencies(${FILESNAME} ${${FILESNAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
+target_link_libraries(${FILESNAME} ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(${FILESNAME} ${catkin_LIBRARIES})
 target_link_libraries(${FILESNAME} ${OpenCV_LIBRARIES})
 target_link_libraries(${FILESNAME} ${Eigen_LIBRARIES})
