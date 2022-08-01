@@ -239,8 +239,6 @@ namespace camera_localization {
         ROS_INFO("[%s]: Features detection started", NODENAME.c_str());
         while (ros::ok()) {
             cv::UMat img_left, img_right;
-            std::vector<cv::UMat> imgs;
-            imgs.resize(2);
             {
                 std::unique_lock ul{m_mut_imgs};
                 using namespace std::chrono_literals;
@@ -250,18 +248,32 @@ namespace camera_localization {
                     ROS_ERROR("[%s]: no new message from left or right camera.  Goodbye!", NODENAME.c_str());
                     return;
                 }
-                imgs.at(0) = m_img_left.getUMat(cv::ACCESS_WRITE);
-                imgs.at(1) = m_img_right.getUMat(cv::ACCESS_RW);
+                img_left = m_img_left.getUMat(cv::ACCESS_READ);
+                img_right = m_img_right.getUMat(cv::ACCESS_READ);
             }
             std::vector<feature_t> features;
+            feature_t f1, f2;
             features.resize(2);
             const auto fnum = m_n_features;
-//#pragma omp parallel for default(none) firstprivate(fnum, m_masks) shared(features, imgs)
-            for (int i = 0; i < 2; ++i) {
-                features.at(i) = det_and_desc_general(imgs[i], m_masks[i], fnum);
+#pragma omp parallel sections default(none) lastprivate(f1, f2) firstprivate(img_left, img_right, fnum, m_mask_left, m_mask_right) num_threads(2)
+            {
+#pragma omp section
+                {
+                    f1 = det_and_desc_general(img_left, m_mask_left, fnum);
+                }
+#pragma omp section
+                {
+                    f2 = det_and_desc_general(img_right, m_mask_right, fnum);
+                }
             }
+
+            std::cout << f1.kpts.size() << " | " << f2.kpts.size() << std::endl;
+//#pragma omp parallel for default(none) firstprivate(fnum, m_masks) shared(features, imgs)
+//            for (int i = 0; i < 2; ++i) {
+//                features.at(i) = det_and_desc_general(imgs[i], m_masks[i], fnum);
+//            }
             std::unique_lock ul{m_mut_features};
-            m_features = std::move(features);
+            m_features = std::vector<feature_t>{f1, f2};
             m_features_ready = true;
             ul.unlock();
             m_cv_features.notify_one();
