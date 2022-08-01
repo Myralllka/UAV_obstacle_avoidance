@@ -65,7 +65,7 @@ namespace camera_localization {
 
         const std::string NODENAME{"CameraLocalization"};
         /* flags */
-        bool m_is_initialized = false;
+        std::atomic<bool> m_is_initialized = false;
 
         bool m_debug_matches, m_debug_distances, m_debug_markers;
 
@@ -127,12 +127,12 @@ namespace camera_localization {
 
         // | ------------------- detection modules -------------------- |
         cv::Mat m_img_debug_fleft, m_img_debug_fright;
-        std::mutex m_mut_imgs, m_mut_features;
-        std::condition_variable m_cv_image, m_cv_features;
+        std::mutex m_mut_imgs{}, m_mut_features{};
+        std::condition_variable m_cv_image{}, m_cv_features{};
 
         cv::Mat m_img_left, m_img_right;
 
-        std::vector<features_t> m_features;
+        std::vector<feature_t> m_features{};
         // | ---------------- pinhole camera models ------------------- |
         image_geometry::PinholeCameraModel m_camera_left;
         image_geometry::PinholeCameraModel m_camera_right;

@@ -8,9 +8,9 @@ namespace camera_localization {
 /* onInit() method //{ */
     void CameraLocalization::onInit() {
 
-        if (cv::ocl::haveOpenCL()) {
-            cv::ocl::setUseOpenCL(true);
-        }
+//        if (cv::ocl::haveOpenCL()) {
+//            cv::ocl::setUseOpenCL(true);
+//        }
         // | ---------------- set my booleans to false ---------------- |
 
         /* obtain node handle */
@@ -144,15 +144,14 @@ namespace camera_localization {
         cv::eigen2cv(m_K_CL_eig, m_K_CL_cv);
         cv::eigen2cv(m_K_CR_eig, m_K_CR_cv);
 
-        // find base-to-right camera and base-to-left camera transformations
         ros::Duration(1.0).sleep();
+        // find base-to-right camera and base-to-left camera transformations
         setUp();
         ROS_INFO_ONCE("[CameraLocalization]: initialized");
-
-        std::thread t_features{&CameraLocalization::m_features_detection, this};
-        std::thread t_corresp{&CameraLocalization::m_corresp_matching, this};
-
         m_is_initialized = true;
+        // STD thread here can not be used! see https://blog.actorsfit.com/a?ID=01200-1fe887f5-3992-4623-99fc-dba0685f90c4
+        boost::thread t_corresp{&CameraLocalization::m_corresp_matching, this};
+        boost::thread t_features{&CameraLocalization::m_features_detection, this};
     }
 //}
 
@@ -234,26 +233,30 @@ namespace camera_localization {
 // | -------------------- other functions ------------------- |
 
     void CameraLocalization::m_features_detection() {
-        while (not m_is_initialized) {}
-        ROS_INFO("[%s]: ", NODENAME.c_str());
-
+        while (not m_is_initialized) {
+            continue;
+        }
+        ROS_INFO("[%s]: Features detection started", NODENAME.c_str());
         while (ros::ok()) {
             cv::UMat img_left, img_right;
             std::vector<cv::UMat> imgs;
-            imgs.reserve(2);
+            imgs.resize(2);
             {
                 std::unique_lock ul{m_mut_imgs};
                 using namespace std::chrono_literals;
-                m_cv_image.wait_for(ul, 100ms, [&] { return m_img_ready; });
+                m_cv_image.wait_for(ul, 5s, [&] { return m_img_ready; });
                 m_img_ready = false;
-                imgs.at(0) = m_img_left.getUMat(cv::ACCESS_RW);
+                if (m_img_left.empty() or m_img_right.empty()) {
+                    ROS_ERROR("[%s]: no new message from left or right camera.  Goodbye!", NODENAME.c_str());
+                    return;
+                }
+                imgs.at(0) = m_img_left.getUMat(cv::ACCESS_WRITE);
                 imgs.at(1) = m_img_right.getUMat(cv::ACCESS_RW);
             }
-
             std::vector<feature_t> features;
             features.resize(2);
             const auto fnum = m_n_features;
-#pragma omp parallel for default(none) firstprivate(fnum, m_masks) shared(features, imgs)
+//#pragma omp parallel for default(none) firstprivate(fnum, m_masks) shared(features, imgs)
             for (int i = 0; i < 2; ++i) {
                 features.at(i) = det_and_desc_general(imgs[i], m_masks[i], fnum);
             }
@@ -263,29 +266,32 @@ namespace camera_localization {
             ul.unlock();
             m_cv_features.notify_one();
         }
+        ROS_INFO("[%s]: Features detection ended", NODENAME.c_str());
     }
 
     void CameraLocalization::m_corresp_matching() {
-        while (not m_is_initialized) {}
-        std::cout << "1" << std::endl;
+        while (not m_is_initialized) {
+            continue;
+        }
         while (ros::ok()) {
-            std::cout << "2" << std::endl;
-            std::vector<feature_t> l_features;
+            std::vector<feature_t> l_features{};
             {
                 std::unique_lock ul{m_mut_features};
                 using namespace std::chrono_literals;
-                m_cv_features.wait_for(ul, 100ms, [&] { return m_features_ready; });
+                m_cv_features.wait_for(ul, 5s, [&] { return m_features_ready; });
                 m_features_ready = false;
+                if (m_features.empty()) {
+                    ROS_ERROR("[%s]: no new features to match detected.  Goodbye!", NODENAME.c_str());
+                    return;
+                }
                 l_features = std::move(m_features);
+                m_features.clear();
             }
-
-            std::cout << "3" << std::endl;
             if ((l_features.at(0).kpts.size() < 10) or (l_features.at(1).kpts.size() < 10)) {
                 ROS_WARN_THROTTLE(1.0, "[%s]: no keypoints visible", NODENAME.c_str());
                 continue;
             }
 
-            std::cout << "4" << std::endl;
             std::vector<cv::DMatch> matches;
             matcher->match(l_features.at(0).descs,
                            l_features.at(1).descs,
@@ -300,7 +306,6 @@ namespace camera_localization {
             std::vector<cv::DMatch> matches_filtered;
             std::vector<cv::Point2d> kpts_filtered_1, kpts_filtered_2, kpts_filtered_1_rect, kpts_filtered_2_rect;
 
-            std::cout << "5" << std::endl;
             filter_matches(matches,
                            l_features.at(0).kpts, l_features.at(1).kpts,
                            m_o1_2d, m_o2_2d,
@@ -308,22 +313,20 @@ namespace camera_localization {
                            kpts_filtered_1, kpts_filtered_2,
                            kpts_filtered_1_rect, kpts_filtered_2_rect);
 
-            std::cout << "6" << std::endl;
-            if (m_debug_matches) {
-                cv::Mat im_matches;
-                cv::drawMatches(m_img_debug_fleft, l_features.at(0).kpts,
-                                m_img_debug_fright, l_features.at(1).kpts,
-                                matches_filtered,
-                                im_matches,
-                                cv::Scalar::all(-1), cv::Scalar::all(-1),
-                                std::vector<char>(),
-                                cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-                m_pub_im_corresp.publish(
-                        cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, im_matches).toImageMsg());
-                ROS_INFO_THROTTLE(2.0, "[%s & OpenCV]: Correspondences published", NODENAME.c_str());
-            }
+//            if (m_debug_matches) {
+//                cv::Mat im_matches;
+//                cv::drawMatches(imleft, l_features.at(0).kpts,
+//                                imright, l_features.at(1).kpts,
+//                                matches_filtered,
+//                                im_matches,
+//                                cv::Scalar::all(-1), cv::Scalar::all(-1),
+//                                std::vector<char>(),
+//                                cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+//                m_pub_im_corresp.publish(
+//                        cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, im_matches).toImageMsg());
+//                ROS_INFO_THROTTLE(2.0, "[%s & OpenCV]: Correspondences published", NODENAME.c_str());
+//            }
 
-            std::cout << "6" << std::endl;
             std::vector<Eigen::Vector3d> res_pts_3d, res_pts_3d_tmp;
             if (m_method_triang == "svd") {
                 cv::Mat res_4d_homogenous;
@@ -379,36 +382,34 @@ namespace camera_localization {
                 m_pub_markarray.publish(markerarr);
             }
 
-            if (m_debug_distances) {
-                cv::rectangle(imleft, rect_l, cv::Scalar{0, 100, 0}, 2);
-                cv::rectangle(imright, rect_r, cv::Scalar{0, 100, 0}, 2);
+//            if (m_debug_distances) {
+//                cv::rectangle(imleft, rect_l, cv::Scalar{0, 100, 0}, 2);
+//                cv::rectangle(imright, rect_r, cv::Scalar{0, 100, 0}, 2);
 
-                for (size_t i = 0; i < res_pts_3d.size(); ++i) {
-                    std::ostringstream out;
-                    out.precision(2);
-                    out << std::fixed << res_pts_3d[i].norm();
-                    cv::putText(imleft, out.str(), kpts_filtered_1[i],
-                                cv::FONT_HERSHEY_PLAIN, 1, colors[i], 2);
+//                for (size_t i = 0; i < res_pts_3d.size(); ++i) {
+//                    std::ostringstream out;
+//                    out.precision(2);
+//                    out << std::fixed << res_pts_3d[i].norm();
+//                    cv::putText(imleft, out.str(), kpts_filtered_1[i],
+//                                cv::FONT_HERSHEY_PLAIN, 1, colors[i], 2);
 
-                    cv::putText(imright, out.str(), kpts_filtered_2[i],
-                                cv::FONT_HERSHEY_PLAIN, 1, colors[i], 2);
-                }
-                m_pub_im_left_debug.publish(
-                        cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imleft).toImageMsg());
-                m_pub_im_right_debug.publish(
-                        cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imright).toImageMsg());
-            }
+//                    cv::putText(imright, out.str(), kpts_filtered_2[i],
+//                                cv::FONT_HERSHEY_PLAIN, 1, colors[i], 2);
+//                }
+//                m_pub_im_left_debug.publish(
+//                        cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imleft).toImageMsg());
+//                m_pub_im_right_debug.publish(
+//                        cv_bridge::CvImage(std_msgs::Header(), m_imgs_encoding, imright).toImageMsg());
+//        }
 
-            std::cout << "7" << std::endl;
             auto pc_res = boost::make_shared<sensor_msgs::PointCloud2>();
             pts2cloud(res_pts_3d, pc_res, m_name_base);
 //            sensor_msgs::PointCloud2 pc_res;
-            std::cout << "8" << std::endl;
             m_pub_pcld.publish(pc_res);
         }
     }
 
-    // ===================== UTILS =====================
+// ===================== UTILS =====================
     std::vector<Eigen::Vector3d> CameraLocalization::triangulate_primitive(const std::vector<cv::Point2d> &kpts1,
                                                                            const std::vector<cv::Point2d> &kpts2) {
         std::vector<Eigen::Vector3d> res_pc;
